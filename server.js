@@ -231,6 +231,49 @@ app.delete("/puntos/:id", async (req, res) => {
   }
 });
 
+//Borrar evento
+app.delete("/eventos/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "DELETE FROM eventos WHERE ID = $1 RETURNING ID",
+      [id]
+    );
+
+    if (result.length === 0){
+      return res.status(404).json({ error: "Evento no encontrado" });
+    }
+    res.status(200).json({
+      mensaje: "Evento eliminado correctamente",
+      evento_id: result[0].id,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
+//Borrar usuario
+app.delete("/usuarios/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "DELETE FROM usuarios WHERE ID = $1 RETURNING ID",
+      [id]
+    );
+
+    if (result.length === 0){
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    res.status(200).json({
+      mensaje: "Usuario eliminado correctamente",
+      usuario_id: result[0].id,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
 
 // -------------------- INICIAR SERVIDOR --------------------
 app.listen(port, "0.0.0.0", () => {
