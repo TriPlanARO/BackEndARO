@@ -1,5 +1,6 @@
 import express from "express";
 import { query } from "./conectarBD.js"; // conexión a Supabase/PostgreSQL
+import bcrypt from "bcrypt";
 
 const app = express();
 app.use(express.json()); // para procesar JSON
@@ -86,7 +87,7 @@ app.get("/usuarios/:id", async (req, res) => {
 app.get("/eventos", async (req, res) => {
   try {
     const eventos = await query(`
-      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.punto_id, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
       FROM eventos e
       LEFT JOIN puntos_interes p ON e.punto_id = p.id
       ORDER BY e.id;
@@ -103,7 +104,11 @@ app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-      "SELECT ID, NOMBRE, TIPO, DESCRIPCION, IMAGEN, FECHA_INI, FECHA_FIN, PUNTO_ID FROM eventos WHERE ID = $1",
+    `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+      FROM eventos e
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
+      WHERE e.id = $1
+      ORDER BY e.id;`,
       [id]
     );
     res.json(evento);
@@ -117,7 +122,7 @@ app.get("/eventos/:id", async (req, res) => {
 
 //Añadir puntos con POST
 app.post("/puntos", async (req, res) => {
-  const { nombre, tipo, latitud, longitud, descripcion } = req.body;
+  const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body;
 
   // Validar campos obligatorios
   if (!nombre || !tipo || latitud === undefined || longitud === undefined) {
@@ -127,10 +132,10 @@ app.post("/puntos", async (req, res) => {
   try {
     // Insertar el punto de interés
     const result = await query(
-      `INSERT INTO puntos_interes (nombre, tipo, latitud, longitud, descripcion)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, nombre, tipo, latitud, longitud, descripcion`,
-      [nombre, tipo, latitud, longitud, descripcion || null]
+      `INSERT INTO puntos_interes (nombre, tipo, latitud, longitud, descripcion, imagen)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, nombre, tipo, latitud, longitud, descripcion, imagen`,
+      [nombre, tipo, latitud, longitud, descripcion || null, imagen || null]
     );
 
     res.status(201).json({
@@ -149,17 +154,20 @@ app.post("/usuarios", async (req, res) => {
   const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
 
   // Verificar campos obligatorios
-  if (!nombre_usuario || !nombre || !apellido || !email || !contraseña) {
+  if (!nombre_usuario || !nombre || !apellido || !email || !contraseña || !telefono) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
 
   try {
+    const saltRounds = 10; // número de rondas de hashing
+    const hashedPassword = await bcrypt.hash(contraseña, saltRounds);
+
     // Insertar en la base de datos
     const result = await query(
       `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contrasena, telefono)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, nombre_usuario, nombre, apellido, email, telefono`,
-      [nombre_usuario, nombre, apellido, email, contraseña, telefono || null]
+      [nombre_usuario, nombre, apellido, email, hashedPassword, telefono]
     );
 
     res.status(201).json({
