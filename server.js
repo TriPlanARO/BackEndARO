@@ -143,8 +143,8 @@ app.post("/puntos", async (req, res) => {
       punto: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar punto:", err);
-    res.status(500).json({ error: "Error al insertar punto de interés" });
+  console.error("Error al insertar punto:", err.message, err.stack);
+  res.status(500).json({ error: "Error al insertar punto de interés" });
   }
 });
 
@@ -175,7 +175,7 @@ app.post("/usuarios", async (req, res) => {
       usuario: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar usuario:", err);
+    console.error("Error al insertar usuario:", err.message, err.stack);
     res.status(500).json({ error: "Error al insertar usuario" });
   }
 });
