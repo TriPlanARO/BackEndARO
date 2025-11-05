@@ -208,6 +208,29 @@ app.post("/eventos", async (req, res) => {
   }
 });
 
+//--------------------- DELETES ----------------------
+//Borrar punto de interés
+app.delete("/puntos/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "DELETE FROM puntos_interes WHERE ID = $1 RETURNING ID",
+      [id]
+    );
+
+    if (result.length === 0){
+      return res.status(404).json({ error: "Punto de interés no encontrado" });
+    }
+    res.status(200).json({
+      mensaje: "Punto eliminado correctamente",
+      punto_id: result[0].id,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
 
 // -------------------- INICIAR SERVIDOR --------------------
 app.listen(port, "0.0.0.0", () => {
