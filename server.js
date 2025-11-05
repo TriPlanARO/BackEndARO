@@ -277,7 +277,7 @@ app.delete("/usuarios/:id", async (req, res) => {
 
 //--------------------- UPDATES ----------------------
 //Update de la contraseña de un usuario
-app.put("/usuarios/:id/cambiar-contraseña", async (req, res) => {
+app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
   const id = req.params.id; 
   const { nueva_contraseña, vieja_contraseña } = req.body; 
 
