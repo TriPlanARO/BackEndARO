@@ -85,9 +85,12 @@ app.get("/usuarios/:id", async (req, res) => {
 // Obtener todos los eventos
 app.get("/eventos", async (req, res) => {
   try {
-    const eventos = await query(
-      "SELECT ID, NOMBRE, TIPO, DESCRIPCION, IMAGEN, FECHA_INI, FECHA_FIN, PUNTO_ID FROM eventos"
-    );
+    const eventos = await query(`
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.punto_id, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+      FROM eventos e
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
+      ORDER BY e.id;
+    `);
     res.json(eventos);
   } catch (err) {
     console.error("Error al consultar la BD:", err);
