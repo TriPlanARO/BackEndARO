@@ -56,7 +56,7 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
 app.get("/usuarios", async (req, res) => {
   try {
     const usuarios = await query(
-      "SELECT ID, NOMBRE_USUARIO FROM usuarios"
+      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASEÑA, TELEFONO FROM usuarios"
     );
     res.json(usuarios);
   } catch (err) {
@@ -70,7 +70,7 @@ app.get("/usuarios/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const usuario = await query(
-      "SELECT ID, NOMBRE_USUARIO, TIPO FROM usuarios WHERE ID = $1",
+      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASEÑA, TELEFONO FROM usuarios WHERE ID = $1",
       [id]
     );
     res.json(usuario);
@@ -86,7 +86,7 @@ app.get("/usuarios/:id", async (req, res) => {
 app.get("/eventos", async (req, res) => {
   try {
     const eventos = await query(
-      "SELECT ID, NOMBRE, LATITUD , LONGITUD FROM eventos"
+      "SELECT ID, NOMBRE, TIPO, DESCRIPCION, IMAGEN, FECHA_INI, FECHA_FIN, PUNTO_ID FROM eventos"
     );
     res.json(eventos);
   } catch (err) {
@@ -100,7 +100,7 @@ app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-      "SELECT ID, NOMBRE, LATITUD , LONGITUD FROM eventos WHERE ID = $1",
+      "SELECT ID, NOMBRE, TIPO, DESCRIPCION, IMAGEN, FECHA_INI, FECHA_FIN, PUNTO_ID FROM eventos WHERE ID = $1",
       [id]
     );
     res.json(evento);
