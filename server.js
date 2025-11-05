@@ -276,6 +276,142 @@ app.delete("/usuarios/:id", async (req, res) => {
 });
 
 //--------------------- UPDATES ----------------------
+//Actualizar puntos de interés
+app.put("/puntos/:id/actualizar", async (req, res) => {
+  const id = req.params.id; 
+  const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body; 
+  const fieldsToUpdate = [];
+  const values = [];
+
+  let queryText = "UPDATE puntos_interes SET ";
+
+  if (nombre) {
+    fieldsToUpdate.push('nombre = $' + (fieldsToUpdate.length + 1));
+    values.push(nombre);
+  }
+
+  if (tipo) {
+    fieldsToUpdate.push('tipo = $' + (fieldsToUpdate.length + 1));
+    values.push(tipo);
+  }
+
+  if (latitud) {
+    fieldsToUpdate.push('latitud = $' + (fieldsToUpdate.length + 1));
+    values.push(latitud);
+  }
+
+  if (longitud) {
+    fieldsToUpdate.push('longitud = $' + (fieldsToUpdate.length + 1));
+    values.push(longitud);
+  }
+  
+  if (descripcion) {
+    fieldsToUpdate.push('descripcion = $' + (fieldsToUpdate.length + 1));
+    values.push(descripcion);
+  }
+
+  if (imagen) {
+    fieldsToUpdate.push('imagen = $' + (fieldsToUpdate.length + 1));
+    values.push(imagen);
+  }
+
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+  }
+
+  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, latitud, longitud, descripcion, imagen ";
+  values.push(id);
+
+
+  try {
+
+    const result = await query(queryText, values);
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Punto no encontrado" });
+    }
+
+    res.status(200).json({
+      mensaje: "Punto actualizado correctamente",
+      punto: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar el punto:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
+//Actualizar eventos
+app.put("/eventos/:id/actualizar", async (req, res) => {
+  const id = req.params.id; 
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body; 
+  const fieldsToUpdate = [];
+  const values = [];
+
+  let queryText = "UPDATE eventos SET ";
+
+  if (nombre) {
+    fieldsToUpdate.push('nombre = $' + (fieldsToUpdate.length + 1));
+    values.push(nombre);
+  }
+
+  if (tipo) {
+    fieldsToUpdate.push('tipo = $' + (fieldsToUpdate.length + 1));
+    values.push(tipo);
+  }
+  
+  if (descripcion) {
+    fieldsToUpdate.push('descripcion = $' + (fieldsToUpdate.length + 1));
+    values.push(descripcion);
+  }
+
+  if (imagen) {
+    fieldsToUpdate.push('imagen = $' + (fieldsToUpdate.length + 1));
+    values.push(imagen);
+  }
+  
+  if (fecha_ini) {
+    fieldsToUpdate.push('fecha_ini = $' + (fieldsToUpdate.length + 1));
+    values.push(fecha_ini);
+  }
+
+  if (fecha_fin) {
+    fieldsToUpdate.push('fecha_fin = $' + (fieldsToUpdate.length + 1));
+    values.push(fecha_fin);
+  }
+
+  if (punto_id) {
+    fieldsToUpdate.push('punto_id = $' + (fieldsToUpdate.length + 1));
+    values.push(punto_id);
+  }
+
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+  }
+
+  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id";
+  values.push(id);
+
+
+  try {
+
+    const result = await query(queryText, values);
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Evento no encontrado" });
+    }
+
+    res.status(200).json({
+      mensaje: "Evento actualizado correctamente",
+      evento: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar el evento:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
+
 //Update de la contraseña de un usuario
 app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
   const id = req.params.id; 
@@ -320,6 +456,7 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
   }
 });
 
+//Actualizar cualquier campo de usuarios
 app.put("/usuarios/:id/actualizar", async (req, res) => {
   const id = req.params.id; 
   const { nombre_usuario, nombre, apellido, email, telefono } = req.body; 
