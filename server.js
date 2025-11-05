@@ -166,7 +166,7 @@ app.post("/usuarios", async (req, res) => {
     const result = await query(
       `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contrasena, telefono)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, nombre_usuario, nombre, apellido, email, telefono`,
+       RETURNING id, nombre_usuario, nombre, apellido, email, contrasena, telefono`,
       [nombre_usuario, nombre, apellido, email, hashedPassword, telefono]
     );
 
@@ -194,7 +194,7 @@ app.post("/eventos", async (req, res) => {
     const result = await query(
       `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id)
        VALUES ($1, $2, ST_GeographyFromText($3), $4, $5, $6, $7)
-       RETURNING id, nombre, tipo, coordenadas::text AS coordenadas, descripcion, imagen, fecha_ini, fecha_fin`,
+       RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id`,
       [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null]
     );
 
