@@ -56,7 +56,7 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
 app.get("/usuarios", async (req, res) => {
   try {
     const usuarios = await query(
-      "SELECT ID, NOMBRE_USUARIO, TIPO FROM usuarios"
+      "SELECT ID, NOMBRE_USUARIO FROM usuarios"
     );
     res.json(usuarios);
   } catch (err) {
