@@ -279,28 +279,40 @@ app.delete("/usuarios/:id", async (req, res) => {
 //Update de la contraseña de un usuario
 app.put("/usuarios/:id/cambiar-contraseña", async (req, res) => {
   const id = req.params.id; 
-  const { nueva_contraseña } = req.body; 
+  const { nueva_contraseña, vieja_contraseña } = req.body; 
 
-  if (!nueva_contraseña) {
-    return res.status(400).json({ error: "Hay que añadir la nueva contraseña" });
+  if (!nueva_contraseña || !vieja_contraseña) {
+    return res.status(400).json({ error: "Hay que añadir tanto la nueva como la vieja contraseña" });
   }
 
   try {
-    const saltRounds = 10; 
-    const hashedPassword = await bcrypt.hash(nueva_contraseña, saltRounds);
 
-    const result = await query(
-      "UPDATE usuarios SET contrasena = $1 WHERE id = $2 RETURNING id, nombre_usuario, nombre, apellido, email, telefono",
-      [hashedPassword, id]
-    );
+    const result = await query("SELECT contrasena FROM usuarios WHERE id = $1", [id]);
 
     if (result.length === 0) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
+    const match = await bcrypt.compare(vieja_contraseña, result[0].contrasena);
+
+    if (!match) {
+      return res.status(401).json({ error: "La contraseña actual es incorrecta" });
+    }
+    const saltRounds = 10; 
+    const hashedPassword = await bcrypt.hash(nueva_contraseña, saltRounds);
+
+    const resultUpdate = await query(
+      "UPDATE usuarios SET contrasena = $1 WHERE id = $2 RETURNING id, nombre_usuario, nombre, apellido, email, telefono",
+      [hashedPassword, id]
+    );
+
+    if (resultUpdate.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
     res.status(200).json({
       mensaje: "Contraseña actualizada correctamente",
-      usuario: result[0],
+      usuario: resultUpdate[0],
     });
   } catch (err) {
     console.error("Error al actualizar la contraseña:", err);
