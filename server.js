@@ -143,7 +143,7 @@ app.post("/puntos", async (req, res) => {
       punto: result[0],
     });
   } catch (err) {
-  console.error("Error al insertar punto:", err.message, err.stack);
+  console.error("Error al insertar punto:", err);
   res.status(500).json({ error: "Error al insertar punto de interés" });
   }
 });
@@ -175,27 +175,27 @@ app.post("/usuarios", async (req, res) => {
       usuario: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar usuario:", err.message, err.stack);
+    console.error("Error al insertar usuario:", err);
     res.status(500).json({ error: "Error al insertar usuario" });
   }
 });
 
 // Añadir nuevo evento (POST) con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
-  const { nombre, tipo, coordenadas, descripcion, imagen, fecha_ini, fecha_fin } = req.body;
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body;
 
   // Validar campos obligatorios
-  if (!nombre || !tipo || !coordenadas || !fecha_ini) {
+  if (!nombre || !tipo || !fecha_ini) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
 
   try {
     // Insertar el evento
     const result = await query(
-      `INSERT INTO eventos (nombre, tipo, coordenadas, descripcion, imagen, fecha_ini, fecha_fin)
+      `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id)
        VALUES ($1, $2, ST_GeographyFromText($3), $4, $5, $6, $7)
        RETURNING id, nombre, tipo, coordenadas::text AS coordenadas, descripcion, imagen, fecha_ini, fecha_fin`,
-      [nombre, tipo, coordenadas, descripcion || null, imagen || null, fecha_ini, fecha_fin || null]
+      [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null]
     );
 
     res.status(201).json({
