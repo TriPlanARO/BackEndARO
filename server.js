@@ -193,7 +193,7 @@ app.post("/eventos", async (req, res) => {
     // Insertar el evento
     const result = await query(
       `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id)
-       VALUES ($1, $2, ST_GeographyFromText($3), $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id`,
       [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null]
     );
