@@ -56,7 +56,7 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
 app.get("/usuarios", async (req, res) => {
   try {
     const usuarios = await query(
-      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASEÑA, TELEFONO FROM usuarios"
+      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios"
     );
     res.json(usuarios);
   } catch (err) {
@@ -70,7 +70,7 @@ app.get("/usuarios/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const usuario = await query(
-      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASEÑA, TELEFONO FROM usuarios WHERE ID = $1",
+      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios WHERE ID = $1",
       [id]
     );
     res.json(usuario);
@@ -153,7 +153,7 @@ app.post("/usuarios", async (req, res) => {
   try {
     // Insertar en la base de datos
     const result = await query(
-      `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contraseña, telefono)
+      `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contrasena, telefono)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, nombre_usuario, nombre, apellido, email, telefono`,
       [nombre_usuario, nombre, apellido, email, contraseña, telefono || null]
