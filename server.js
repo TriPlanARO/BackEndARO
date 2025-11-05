@@ -320,6 +320,67 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
   }
 });
 
+app.put("/usuarios/:id/actualizar", async (req, res) => {
+  const id = req.params.id; 
+  const { nombre_usuario, nombre, apellido, email, telefono } = req.body; 
+
+  const fieldsToUpdate = [];
+  const values = [];
+
+  let queryText = "UPDATE usuarios SET ";
+
+  if (nombre_usuario) {
+    fieldsToUpdate.push('nombre_usuario = $' + (fieldsToUpdate.length + 1));
+    values.push(nombre_usuario);
+  }
+
+  if (nombre) {
+    fieldsToUpdate.push('nombre = $' + (fieldsToUpdate.length + 1));
+    values.push(nombre);
+  }
+
+  if (apellido) {
+    fieldsToUpdate.push('apellido = $' + (fieldsToUpdate.length + 1));
+    values.push(apellido);
+  }
+
+  if (email) {
+    fieldsToUpdate.push('email = $' + (fieldsToUpdate.length + 1));
+    values.push(email);
+  }
+
+  if (telefono) {
+    fieldsToUpdate.push('telefono = $' + (fieldsToUpdate.length + 1));
+    values.push(telefono);
+  }
+
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+  }
+
+  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre_usuario, nombre, apellido, email, telefono";
+  values.push(id);
+
+
+  try {
+
+    const result = await query(queryText, values);
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(200).json({
+      mensaje: "Usuario actualizado correctamente",
+      usuario: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar el usuario:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
+
 
 // -------------------- INICIAR SERVIDOR --------------------
 app.listen(port, "0.0.0.0", () => {
