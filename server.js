@@ -275,6 +275,40 @@ app.delete("/usuarios/:id", async (req, res) => {
   }
 });
 
+//--------------------- UPDATES ----------------------
+//Update de la contraseña de un usuario
+app.put("/usuarios/:id/cambiar-contraseña", async (req, res) => {
+  const id = req.params.id; 
+  const { nueva_contraseña } = req.body; 
+
+  if (!nueva_contraseña) {
+    return res.status(400).json({ error: "Hay que añadir la nueva contraseña" });
+  }
+
+  try {
+    const saltRounds = 10; 
+    const hashedPassword = await bcrypt.hash(nueva_contraseña, saltRounds);
+
+    const result = await query(
+      "UPDATE usuarios SET contrasena = $1 WHERE id = $2 RETURNING id, nombre_usuario, nombre, apellido, email, telefono",
+      [hashedPassword, id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(200).json({
+      mensaje: "Contraseña actualizada correctamente",
+      usuario: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar la contraseña:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
+
 // -------------------- INICIAR SERVIDOR --------------------
 app.listen(port, "0.0.0.0", () => {
   console.log(`Servidor escuchando en puerto ${port}`);
