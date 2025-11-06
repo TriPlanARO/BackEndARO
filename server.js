@@ -291,10 +291,7 @@ app.post("/eventos", async (req, res) => {
 //--------------------- DELETES ----------------------
 //Borrar punto de interés
 app.delete("/puntos/:id", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "ID inválido" });
-  }
+  const id = req.params.id;
 
   try {
     const result = await query(
