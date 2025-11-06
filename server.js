@@ -201,7 +201,6 @@ app.post("/puntos/tipo", async (req, res) => {
     return res.status(400).json({ error: "Debe enviar el nuevo tipo" });
   }
 
-  // Validar que solo tenga letras y números para prevenir SQL injection
   if (!/^[a-zA-Z0-9]+$/.test(nuevoTipo)) {
     return res.status(400).json({ error: "Tipo inválido" });
   }
@@ -222,8 +221,6 @@ app.post("/puntos/tipo", async (req, res) => {
     });
   }
 });
-
-
 
 
 // Añadir usuario con POST
@@ -294,7 +291,11 @@ app.post("/eventos", async (req, res) => {
 //--------------------- DELETES ----------------------
 //Borrar punto de interés
 app.delete("/puntos/:id", async (req, res) => {
-  const id = req.params.id;
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
   try {
     const result = await query(
       "DELETE FROM puntos_interes WHERE ID = $1 RETURNING ID",
