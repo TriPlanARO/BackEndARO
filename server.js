@@ -52,8 +52,7 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
       [tipo]
     );
 
-    if (result.length === 0) {
-      // No se encontró el ID
+    if (puntos.length === 0) {
       return res.status(404).json({ error: `No se encontró el tipo ${tipo}` });
     }
 
