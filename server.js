@@ -16,11 +16,8 @@ app.get("/puntos", async (req, res) => {
     );
     res.json(puntos);
   } catch (err) {
-    console.error("Error al consultar la base de datos de puntos:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al consultar la BD:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -29,25 +26,15 @@ app.get("/puntos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
-      "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
+      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
       [id]
     );
-
-    if (result.length === 0) {
-      // No se encontró el ID
-      return res.status(404).json({ error: `No se encontró el punto con ID ${id}` });
-    }
-
-    res.json(result[0]); // Devolver solo el objeto
+    res.json(result);
   } catch (err) {
-    console.error("Error al seleccionar el punto de id:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
-
 
 // Obtener puntos por tipo
 app.get("/puntos/tipo/:tipo", async (req, res) => {
@@ -57,14 +44,10 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
       "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION FROM puntos_interes WHERE TIPO = $1",
       [tipo]
     );
-
     res.json(puntos);
   } catch (err) {
-    console.error("Error al consultar los puntos de tipo:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -78,11 +61,8 @@ app.get("/usuarios", async (req, res) => {
     );
     res.json(usuarios);
   } catch (err) {
-    console.error("Error al consultar la base de datos de usuarios:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -94,19 +74,10 @@ app.get("/usuarios/:id", async (req, res) => {
       "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios WHERE ID = $1",
       [id]
     );
-
-    if (usuario.length === 0) {
-      // No se encontró el ID
-      return res.status(404).json({ error: `No se encontró el usuario con ID ${id}` });
-    } 
-
     res.json(usuario);
   } catch (err) {
-    console.error("Error al seleccionar el usuario con id:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -123,11 +94,8 @@ app.get("/eventos", async (req, res) => {
     `);
     res.json(eventos);
   } catch (err) {
-    console.error("Error al consultar la base de datos de eventos:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al consultar la BD:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -143,19 +111,14 @@ app.get("/eventos/:id", async (req, res) => {
       ORDER BY e.id;`,
       [id]
     );
-
     if (evento.length === 0) {
       // No se encontró el ID
       return res.status(404).json({ error: `No se encontró el evento con ID ${id}` });
     }
-
     res.json(evento);
   } catch (err) {
-    console.error("Error al seleccionar evento de id:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -184,13 +147,43 @@ app.post("/puntos", async (req, res) => {
       punto: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar el punto:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+  console.error("Error al insertar punto:", err);
+  res.status(500).json({ error: "Error al insertar punto de interés" });
   }
 });
+
+
+// Añadir usuario con POST
+app.post("/usuarios", async (req, res) => {
+  const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
+
+  // Verificar campos obligatorios
+  if (!nombre_usuario || !nombre || !apellido || !email || !contraseña || !telefono) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+
+  try {
+    const saltRounds = 10; // número de rondas de hashing
+    const hashedPassword = await bcrypt.hash(contraseña, saltRounds);
+
+    // Insertar en la base de datos
+    const result = await query(
+      `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contrasena, telefono)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, nombre_usuario, nombre, apellido, email, contrasena, telefono`,
+      [nombre_usuario, nombre, apellido, email, hashedPassword, telefono]
+    );
+
+    res.status(201).json({
+      mensaje: "Usuario añadido correctamente",
+      usuario: result[0],
+    });
+  } catch (err) {
+    console.error("Error al insertar usuario:", err);
+    res.status(500).json({ error: "Error al insertar usuario" });
+  }
+});
+
 
 // Añadir un nuevo tipo de punto (tipo_enum)
 app.post("/puntos/tipo", async (req, res) => {
@@ -223,40 +216,6 @@ app.post("/puntos/tipo", async (req, res) => {
 });
 
 
-// Añadir usuario con POST
-app.post("/usuarios", async (req, res) => {
-  const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
-
-  // Verificar campos obligatorios
-  if (!nombre_usuario || !nombre || !apellido || !email || !contraseña || !telefono) {
-    return res.status(400).json({ error: "Faltan campos obligatorios" });
-  }
-
-  try {
-    const saltRounds = 10; // número de rondas de hashing
-    const hashedPassword = await bcrypt.hash(contraseña, saltRounds);
-
-    // Insertar en la base de datos
-    const result = await query(
-      `INSERT INTO usuarios (nombre_usuario, nombre, apellido, email, contrasena, telefono)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, nombre_usuario, nombre, apellido, email, contrasena, telefono`,
-      [nombre_usuario, nombre, apellido, email, hashedPassword, telefono]
-    );
-
-    res.status(201).json({
-      mensaje: "Usuario añadido correctamente",
-      usuario: result[0],
-    });
-  } catch (err) {
-    console.error("Error al insertar el usuario:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
-  }
-});
-
 // Añadir nuevo evento (POST) con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body;
@@ -280,11 +239,8 @@ app.post("/eventos", async (req, res) => {
       evento: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar el evento:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al insertar evento:", err);
+    res.status(500).json({ error: "Error al insertar evento" });
   }
 });
 
@@ -292,30 +248,24 @@ app.post("/eventos", async (req, res) => {
 //Borrar punto de interés
 app.delete("/puntos/:id", async (req, res) => {
   const id = req.params.id;
-
   try {
     const result = await query(
-      "DELETE FROM puntos_interes WHERE id = $1 RETURNING id",
+      "DELETE FROM puntos_interes WHERE ID = $1 RETURNING ID",
       [id]
     );
 
     if (result.length === 0){
       return res.status(404).json({ error: "Punto de interés no encontrado" });
     }
-
     res.status(200).json({
       mensaje: "Punto eliminado correctamente",
       punto_id: result[0].id,
     });
   } catch (err) {
-    console.error("Error al eliminar el punto:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
-
 
 //Borrar evento
 app.delete("/eventos/:id", async (req, res) => {
@@ -334,11 +284,8 @@ app.delete("/eventos/:id", async (req, res) => {
       evento_id: result[0].id,
     });
   } catch (err) {
-    console.error("Error al eliminar el evento:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -359,11 +306,8 @@ app.delete("/usuarios/:id", async (req, res) => {
       usuario_id: result[0].id,
     });
   } catch (err) {
-    console.error("Error al eliminar el usuario:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -429,10 +373,7 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el punto:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -502,12 +443,8 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el evento:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    res.status(500).json({ error: "Error en la base de datos" });
   }
-
 });
 
 
@@ -550,11 +487,8 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
       usuario: resultUpdate[0],
     });
   } catch (err) {
-    console.error("Error al actualizar contraseña del usuario:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al actualizar la contraseña:", err);
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
@@ -615,10 +549,7 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el usuario:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    res.status(500).json({ error: "Error en la base de datos" });
   }
 });
 
