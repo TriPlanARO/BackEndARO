@@ -298,16 +298,18 @@ app.delete("/puntos/:id", async (req, res) => {
 
   try {
     const result = await query(
-      "DELETE FROM puntos_interes WHERE ID = $1 RETURNING ID",
+      "DELETE FROM puntos_interes WHERE id = $1 RETURNING id",
       [id]
     );
 
-    if (result.length === 0){
+    // Para pg, el resultado real está en result.rows
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: "Punto de interés no encontrado" });
     }
+
     res.status(200).json({
       mensaje: "Punto eliminado correctamente",
-      punto_id: result[0].id,
+      punto_id: result.rows[0].id,
     });
   } catch (err) {
     console.error("Error al eliminar el punto:", err);
@@ -317,6 +319,7 @@ app.delete("/puntos/:id", async (req, res) => {
     });
   }
 });
+
 
 //Borrar evento
 app.delete("/eventos/:id", async (req, res) => {
