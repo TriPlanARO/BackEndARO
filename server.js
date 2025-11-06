@@ -16,8 +16,11 @@ app.get("/puntos", async (req, res) => {
     );
     res.json(puntos);
   } catch (err) {
-    console.error("Error al consultar la BD:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de puntos:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -37,8 +40,11 @@ app.get("/puntos/:id", async (req, res) => {
 
     res.json(result[0]); // Devolver solo el objeto
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar el punto de id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -52,14 +58,13 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
       [tipo]
     );
 
-    if (puntos.length === 0) {
-      return res.status(404).json({ error: `No se encontró el tipo ${tipo}` });
-    }
-
     res.json(puntos);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar los puntos de tipo:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -73,8 +78,11 @@ app.get("/usuarios", async (req, res) => {
     );
     res.json(usuarios);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de usuarios:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -94,8 +102,11 @@ app.get("/usuarios/:id", async (req, res) => {
 
     res.json(usuario);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar el usuario con id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -112,8 +123,11 @@ app.get("/eventos", async (req, res) => {
     `);
     res.json(eventos);
   } catch (err) {
-    console.error("Error al consultar la BD:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de eventos:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -137,8 +151,11 @@ app.get("/eventos/:id", async (req, res) => {
 
     res.json(evento);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar evento de id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -167,8 +184,11 @@ app.post("/puntos", async (req, res) => {
       punto: result[0],
     });
   } catch (err) {
-  console.error("Error al insertar punto:", err);
-  res.status(500).json({ error: "Error al insertar punto de interés" });
+    console.error("Error al insertar el punto:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -199,8 +219,11 @@ app.post("/usuarios", async (req, res) => {
       usuario: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar usuario:", err);
-    res.status(500).json({ error: "Error al insertar usuario" });
+    console.error("Error al insertar el usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -227,8 +250,11 @@ app.post("/eventos", async (req, res) => {
       evento: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar evento:", err);
-    res.status(500).json({ error: "Error al insertar evento" });
+    console.error("Error al insertar el evento:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -250,8 +276,11 @@ app.delete("/puntos/:id", async (req, res) => {
       punto_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el punto:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -272,8 +301,11 @@ app.delete("/eventos/:id", async (req, res) => {
       evento_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el evento:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -294,8 +326,11 @@ app.delete("/usuarios/:id", async (req, res) => {
       usuario_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -361,7 +396,10 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el punto:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -431,8 +469,12 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el evento:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
+
 });
 
 
@@ -475,8 +517,11 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
       usuario: resultUpdate[0],
     });
   } catch (err) {
-    console.error("Error al actualizar la contraseña:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al actualizar contraseña del usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -537,7 +582,10 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el usuario:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
