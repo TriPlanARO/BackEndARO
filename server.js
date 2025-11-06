@@ -300,7 +300,7 @@ app.delete("/puntos/:id", async (req, res) => {
     );
 
     // Para pg, el resultado real está en result.rows
-    if (!result.rows || result.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Punto de interés no encontrado" });
     }
 
