@@ -192,6 +192,26 @@ app.post("/puntos", async (req, res) => {
   }
 });
 
+// Añadir un nuevo tipo de punto (tipo_enum)
+app.post("/puntos/tipo", async (req, res) => {
+  const { nuevoTipo } = req.body;
+
+  if (!nuevoTipo) {
+    return res.status(400).json({ error: "Debe enviar el nuevo tipo" });
+  }
+
+  try {
+    // Query para añadir el nuevo valor al enum
+    await query(`ALTER TYPE tipo_enum ADD VALUE IF NOT EXISTS $1`, [nuevoTipo]);
+
+    res.status(201).json({ mensaje: `Tipo '${nuevoTipo}' añadido correctamente` });
+  } catch (err) {
+    console.error("Error al añadir tipo:", err);
+    res.status(500).json({ error: "Error al añadir el tipo", detalles: err.message });
+  }
+});
+
+
 
 // Añadir usuario con POST
 app.post("/usuarios", async (req, res) => {
