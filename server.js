@@ -196,20 +196,33 @@ app.post("/puntos", async (req, res) => {
 app.post("/puntos/tipo", async (req, res) => {
   const { nuevoTipo } = req.body;
 
+  // Validar campo obligatorio
   if (!nuevoTipo) {
     return res.status(400).json({ error: "Debe enviar el nuevo tipo" });
   }
 
-  try {
-    // Query para añadir el nuevo valor al enum
-    await query(`ALTER TYPE tipo_enum ADD VALUE IF NOT EXISTS $1`, [nuevoTipo]);
+  // Validar que solo tenga letras y números para prevenir SQL injection
+  if (!/^[a-zA-Z0-9]+$/.test(nuevoTipo)) {
+    return res.status(400).json({ error: "Tipo inválido" });
+  }
 
-    res.status(201).json({ mensaje: `Tipo '${nuevoTipo}' añadido correctamente` });
+  try {
+    // Insertar el nuevo tipo en el enum
+    await query(`ALTER TYPE tipo_enum ADD VALUE IF NOT EXISTS '${nuevoTipo}'`);
+
+    res.status(201).json({
+      mensaje: `Tipo '${nuevoTipo}' añadido correctamente`,
+      tipo: nuevoTipo
+    });
   } catch (err) {
-    console.error("Error al añadir tipo:", err);
-    res.status(500).json({ error: "Error al añadir el tipo", detalles: err.message });
+    console.error("Error al añadir el tipo:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
   }
 });
+
 
 
 
