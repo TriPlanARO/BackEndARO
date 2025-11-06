@@ -26,15 +26,22 @@ app.get("/puntos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
-      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
+      "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
       [id]
     );
-    res.json(result);
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el punto con ID ${id}` });
+    }
+
+    res.json(result[0]); // Devolver solo el objeto
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en la base de datos" });
   }
 });
+
 
 // Obtener puntos por tipo
 app.get("/puntos/tipo/:tipo", async (req, res) => {
@@ -44,6 +51,12 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
       "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION FROM puntos_interes WHERE TIPO = $1",
       [tipo]
     );
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el tipo ${tipo}` });
+    }
+
     res.json(puntos);
   } catch (err) {
     console.error(err);
@@ -74,6 +87,12 @@ app.get("/usuarios/:id", async (req, res) => {
       "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios WHERE ID = $1",
       [id]
     );
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el usuario con ID ${id}` });
+    } 
+
     res.json(usuario);
   } catch (err) {
     console.error(err);
@@ -111,6 +130,12 @@ app.get("/eventos/:id", async (req, res) => {
       ORDER BY e.id;`,
       [id]
     );
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el evento con ID ${id}` });
+    }
+
     res.json(evento);
   } catch (err) {
     console.error(err);
