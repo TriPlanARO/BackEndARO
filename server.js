@@ -41,7 +41,7 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
   const tipo = req.params.tipo;
   try {
     const puntos = await query(
-      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION FROM puntos_interes WHERE TIPO = $1",
+      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE TIPO = $1",
       [tipo]
     );
     res.json(puntos);
@@ -50,6 +50,21 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos" });
   }
 });
+
+app.get("/puntos/nombre/:nombre", async (req, res) => {
+  const nombre = req.params.nombre;
+  try {
+    const puntos = await query(
+      "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE NOMBRE ILIKE $1",
+      [`%${nombre}%`]  // `%` es para hacer una búsqueda parcial (LIKE en SQL)
+    );
+    res.json(puntos);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la base de datos" });
+  }
+});
+
 
 // -------------------- RUTAS USUARIOS --------------------
 
