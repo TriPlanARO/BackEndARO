@@ -747,7 +747,9 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   try {
     const result = await query(queryText, values);
 
-    if (result.rows.length === 0) {
+    const rows = result.rows || result;
+
+    if (!rows || rows.length === 0) {
       return res.status(404).json({ error: "Ruta no encontrada" });
     }
 
