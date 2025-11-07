@@ -318,7 +318,6 @@ app.post("/rutas", async (req, res) => {
   }
 
   try {
-    await query("BEGIN");
 
     const resultRuta = await query(
       "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
@@ -326,6 +325,8 @@ app.post("/rutas", async (req, res) => {
     );
 
     const nuevaRuta = resultRuta[0];
+    
+    await query("BEGIN");
 
     for (let i = 0; i < puntos.length; i++) {
       const punto_id = puntos[i];
