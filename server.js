@@ -198,7 +198,8 @@ app.get("/rutas", async (req, res) => {
       `SELECT r.*, json_agg(json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen)) AS puntos_interes
       FROM rutas r
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
-        LEFT JOIN puntos_interes p ON r2.punto_id = p.id`);
+        LEFT JOIN puntos_interes p ON r2.punto_id = p.id
+      GROUP BY r.id`);
     res.json(rutas);
   } catch (err) {
     console.error("Error al consultar la base de datos de rutas:", err);
@@ -218,7 +219,8 @@ app.get("/rutas/:id", async (req, res) => {
       FROM rutas r
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
-      WHERE r.id = $1`,
+      WHERE r.id = $1
+      GROUP BY r.id`,
       [id]
     );
     if (result.length === 0) {
