@@ -199,7 +199,8 @@ app.get("/rutas", async (req, res) => {
       FROM rutas r
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
-      GROUP BY r.id`);
+      GROUP BY r.id
+      ORDER BY p.id ASC`);
     res.json(rutas);
   } catch (err) {
     console.error("Error al consultar la base de datos de rutas:", err);
@@ -210,7 +211,7 @@ app.get("/rutas", async (req, res) => {
   }
 });
 
-// Obtener punto por ID
+// Obtener una ruta por ID
 app.get("/rutas/:id", async (req, res) => {
   const id = req.params.id;
   try {
@@ -220,7 +221,8 @@ app.get("/rutas/:id", async (req, res) => {
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
       WHERE r.id = $1
-      GROUP BY r.id`,
+      GROUP BY r.id
+      ORDER BY p.id ASC`,
       [id]
     );
     if (result.length === 0) {
@@ -235,35 +237,6 @@ app.get("/rutas/:id", async (req, res) => {
       error: "Error en la base de datos",
       detalles: err.message 
     });
-  }
-});
-
-// Obtener todos los puntos de todas las rutas
-app.get("/relacion_rutas_puntos", async (req, res) => {
-  try {
-    const result = await query("SELECT * FROM relacion_rutas_puntos ORDER BY ruta_id, orden ASC");
-    res.json(result);
-  } catch (err) {
-    console.error("Error al consultar relación rutas-puntos:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
-
-// Obtener puntos de una ruta específica (en orden)
-app.get("/rutas/:id/puntos", async (req, res) => {
-  const ruta_id = req.params.id;
-  try {
-    const result = await query(`
-      SELECT rp.orden, p.*
-      FROM relacion_rutas_puntos rp
-      JOIN puntos_interes p ON rp.punto_id = p.id
-      WHERE rp.ruta_id = $1
-      ORDER BY rp.orden ASC
-    `, [ruta_id]);
-    res.json(result);
-  } catch (err) {
-    console.error("Error al obtener puntos de la ruta:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
@@ -342,6 +315,51 @@ app.post("/rutas", async (req, res) => {
     res.status(201).json({ mensaje: "Ruta creada correctamente", ruta: result[0] });
   } catch (err) {
     console.error("Error al crear ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+app.post("/rutas", async (req, res) => {
+  const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs de los puntos
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
+
+  // Validación de que los puntos sean un array y que contengan al menos un punto
+  if (puntos && !Array.isArray(puntos)) {
+    return res.status(400).json({ error: "Los puntos deben ser un array" });
+  }
+
+  if (puntos && puntos.length === 0) {
+    return res.status(400).json({ error: "Debe haber al menos un punto asociado a la ruta" });
+  }
+
+  try {
+    await query("BEGIN");
+
+    const resultRuta = await query(
+      "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
+      [nombre, descripcion || null]
+    );
+
+    const nuevaRuta = resultRuta[0];
+
+    const values = puntos.map((punto_id, index) => `($1, $${index + 2}, $${index + 3})`).join(", ");
+    const queryParams = [nuevaRuta.id, ...puntos.map((punto_id, index) => [punto_id, index + 1]).flat()];
+
+    await query(
+      `INSERT INTO relacion_rutas_puntos (ruta_id, punto_id, orden) VALUES ${values}`,
+      queryParams
+    );
+
+    await query("COMMIT");
+
+    res.status(201).json({
+      mensaje: "Ruta y puntos añadidos correctamente",
+      ruta: nuevaRuta,
+      puntos_asociados: puntos || []
+    });
+
+  } catch (err) {
+    await query("ROLLBACK");
+    console.error("Error al crear ruta y añadir puntos:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
