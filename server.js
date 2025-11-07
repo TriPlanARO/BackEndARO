@@ -716,7 +716,6 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
 
-  // Inicializamos arrays para construir la query dinámicamente
   const fieldsToUpdate = [];
   const values = [];
 
@@ -741,7 +740,7 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   const queryText = `
     UPDATE rutas
     SET ${fieldsToUpdate.join(", ")}
-    WHERE ruta_id = $${values.length}
+    WHERE id = $${values.length}
     RETURNING *;
   `;
 
@@ -765,7 +764,6 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
     });
   }
 });
-
 
 
 //Actualizar eventos
