@@ -460,7 +460,11 @@ app.delete("/puntos/:id", async (req, res) => {
   const id = req.params.id;
 
   try {
+
     await query("DELETE FROM eventos WHERE punto_id = $1", [id]);
+    
+    await query("DELETE FROM relacion_rutas_puntos WHERE punto_id = $1", [id]);
+    
     const result = await query(
       "DELETE FROM puntos_interes WHERE id = $1 RETURNING id",
       [id]
@@ -487,6 +491,10 @@ app.delete("/puntos/:id", async (req, res) => {
 app.delete("/rutas/:id", async (req, res) => {
   const id = req.params.id;
   try {
+    await query(
+      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 ",
+      [id]
+    );
     const result = await query(
       "DELETE FROM rutas WHERE id = $1 RETURNING *",
        [id]
@@ -507,53 +515,6 @@ app.delete("/rutas/:id", async (req, res) => {
   }
 });
 
-app.delete("/relacion_rutas_puntos/:ruta_id/:punto_id", async (req, res) => {
-  const { ruta_id, punto_id } = req.params;
-
-  try {
-    const result = await query(
-      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2 RETURNING ruta_id, punto_id",
-      [ruta_id, punto_id]
-    );
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "Relación no encontrada" });
-    }
-
-    res.status(200).json({
-      mensaje: "Relación eliminada correctamente",
-      relacion: result[0],
-    });
-  } catch (err) {
-    console.error("Error al eliminar relación:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
-
-// Eliminar todos los puntos de una ruta
-app.delete("/relacion_rutas_puntos/todos/:ruta_id", async (req, res) => {
-  const { ruta_id } = req.params;
-
-  try {
-    const result = await query(
-      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 RETURNING *",
-      [ruta_id]
-    );
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "No se encontraron puntos para esa ruta" });
-    }
-
-    res.status(200).json({
-      mensaje: "Todos los puntos de la ruta eliminados correctamente",
-      ruta_id: ruta_id,
-      puntos_eliminados: result.length
-    });
-  } catch (err) {
-    console.error("Error al eliminar los puntos de la ruta:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
 
 
 //Borrar evento
