@@ -376,22 +376,6 @@ app.post("/rutas", async (req, res) => {
   }
 });
 
-// Añadir punto a una ruta
-app.post("/relacion_rutas_puntos", async (req, res) => {
-  const { ruta_id, punto_id, orden } = req.body;
-  if (!ruta_id || !punto_id || !orden) return res.status(400).json({ error: "Faltan campos obligatorios" });
-  try {
-    const result = await query(
-      "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id, orden) VALUES ($1, $2, $3) RETURNING *",
-      [ruta_id, punto_id, orden]
-    );
-    res.status(201).json({ mensaje: "Punto añadido a la ruta correctamente", relacion: result[0] });
-  } catch (err) {
-    console.error("Error al añadir punto a la ruta:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
-
 
 // Añadir usuario con POST
 app.post("/usuarios", async (req, res) => {
