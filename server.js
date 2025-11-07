@@ -215,7 +215,7 @@ app.get("/rutas/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
-      `SELECT r.* 
+      `SELECT r.*, json_agg(json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen)) AS puntos_interes
       FROM rutas r
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
