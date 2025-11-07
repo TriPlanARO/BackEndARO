@@ -303,21 +303,7 @@ app.post("/puntos/tipo", async (req, res) => {
   }
 });
 
-// Crear nueva ruta
-app.post("/rutas", async (req, res) => {
-  const { nombre, descripcion } = req.body;
-  if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
-  try {
-    const result = await query(
-      "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
-      [nombre, descripcion || null]
-    );
-    res.status(201).json({ mensaje: "Ruta creada correctamente", ruta: result[0] });
-  } catch (err) {
-    console.error("Error al crear ruta:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
+
 app.post("/rutas", async (req, res) => {
   const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs de los puntos
   if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
