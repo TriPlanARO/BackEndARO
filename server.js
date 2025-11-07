@@ -16,8 +16,11 @@ app.get("/puntos", async (req, res) => {
     );
     res.json(puntos);
   } catch (err) {
-    console.error("Error al consultar la BD:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de puntos:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -26,15 +29,25 @@ app.get("/puntos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
-      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
+      "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE ID = $1",
       [id]
     );
-    res.json(result);
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el punto con ID ${id}` });
+    }
+
+    res.json(result[0]); // Devolver solo el objeto
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar el punto de id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
+
 
 // Obtener puntos por tipo
 app.get("/puntos/tipo/:tipo", async (req, res) => {
@@ -44,10 +57,14 @@ app.get("/puntos/tipo/:tipo", async (req, res) => {
       "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE TIPO = $1",
       [tipo]
     );
+
     res.json(puntos);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar los puntos de tipo:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -76,8 +93,11 @@ app.get("/usuarios", async (req, res) => {
     );
     res.json(usuarios);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de usuarios:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -89,10 +109,19 @@ app.get("/usuarios/:id", async (req, res) => {
       "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios WHERE ID = $1",
       [id]
     );
+
+    if (usuario.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el usuario con ID ${id}` });
+    } 
+
     res.json(usuario);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar el usuario con id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -109,8 +138,11 @@ app.get("/eventos", async (req, res) => {
     `);
     res.json(eventos);
   } catch (err) {
-    console.error("Error al consultar la BD:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al consultar la base de datos de eventos:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -126,10 +158,88 @@ app.get("/eventos/:id", async (req, res) => {
       ORDER BY e.id;`,
       [id]
     );
+
+    if (evento.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el evento con ID ${id}` });
+    }
+
     res.json(evento);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al seleccionar evento de id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
+// -------------------- RUTAS --------------------
+
+// Obtener todos las rutas
+app.get("/rutas", async (req, res) => {
+  try {
+    const rutas = await query("SELECT * FROM rutas");
+    res.json(rutas);
+  } catch (err) {
+    console.error("Error al consultar la base de datos de rutas:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
+// Obtener punto por ID
+app.get("/rutas/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "SELECT * FROM rutas WHERE id = $1",
+      [id]
+    );
+
+    if (result.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró la ruta con ID ${id}` });
+    }
+
+    res.json(result[0]); // Devolver solo el objeto
+  } catch (err) {
+    console.error("Error al seleccionar la ruta de id:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
+// Obtener todos los puntos de todas las rutas
+app.get("/relacion_rutas_puntos", async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM relacion_rutas_puntos ORDER BY ruta_id, orden ASC");
+    res.json(result);
+  } catch (err) {
+    console.error("Error al consultar relación rutas-puntos:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Obtener puntos de una ruta específica (en orden)
+app.get("/rutas/:id/puntos", async (req, res) => {
+  const ruta_id = req.params.id;
+  try {
+    const result = await query(`
+      SELECT rp.orden, p.*
+      FROM relacion_rutas_puntos rp
+      JOIN puntos_interes p ON rp.punto_id = p.id
+      WHERE rp.ruta_id = $1
+      ORDER BY rp.orden ASC
+    `, [ruta_id]);
+    res.json(result);
+  } catch (err) {
+    console.error("Error al obtener puntos de la ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
@@ -158,8 +268,73 @@ app.post("/puntos", async (req, res) => {
       punto: result[0],
     });
   } catch (err) {
-  console.error("Error al insertar punto:", err);
-  res.status(500).json({ error: "Error al insertar punto de interés" });
+    console.error("Error al insertar el punto:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
+// Añadir un nuevo tipo de punto (tipo_enum)
+app.post("/puntos/tipo", async (req, res) => {
+  const { nuevoTipo } = req.body;
+
+  // Validar campo obligatorio
+  if (!nuevoTipo) {
+    return res.status(400).json({ error: "Debe enviar el nuevo tipo" });
+  }
+
+  if (!/^[a-zA-Z0-9]+$/.test(nuevoTipo)) {
+    return res.status(400).json({ error: "Tipo inválido" });
+  }
+
+  try {
+    // Insertar el nuevo tipo en el enum
+    await query(`ALTER TYPE tipo_enum ADD VALUE IF NOT EXISTS '${nuevoTipo}'`);
+
+    res.status(201).json({
+      mensaje: `Tipo '${nuevoTipo}' añadido correctamente`,
+      tipo: nuevoTipo
+    });
+  } catch (err) {
+    console.error("Error al añadir el tipo:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
+// Crear nueva ruta
+app.post("/rutas", async (req, res) => {
+  const { nombre, descripcion } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
+  try {
+    const result = await query(
+      "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
+      [nombre, descripcion || null]
+    );
+    res.status(201).json({ mensaje: "Ruta creada correctamente", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al crear ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Añadir punto a una ruta
+app.post("/relacion_rutas_puntos", async (req, res) => {
+  const { ruta_id, punto_id, orden } = req.body;
+  if (!ruta_id || !punto_id || !orden) return res.status(400).json({ error: "Faltan campos obligatorios" });
+  try {
+    const result = await query(
+      "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id, orden) VALUES ($1, $2, $3) RETURNING *",
+      [ruta_id, punto_id, orden]
+    );
+    res.status(201).json({ mensaje: "Punto añadido a la ruta correctamente", relacion: result[0] });
+  } catch (err) {
+    console.error("Error al añadir punto a la ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
@@ -172,8 +347,20 @@ app.post("/usuarios", async (req, res) => {
   if (!nombre_usuario || !nombre || !apellido || !email || !contraseña || !telefono) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
-
+  
   try {
+    // Verificar si ya existe el usuario o el email
+    const existeUsuario = await query(
+      "SELECT * FROM usuarios WHERE nombre_usuario = $1",
+      [nombre_usuario]
+    );
+
+    if (existeUsuario.length > 0) {
+      return res.status(409).json({
+        error: "El nombre de usuario ya está registrado"
+      });
+    }
+
     const saltRounds = 10; // número de rondas de hashing
     const hashedPassword = await bcrypt.hash(contraseña, saltRounds);
 
@@ -190,8 +377,11 @@ app.post("/usuarios", async (req, res) => {
       usuario: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar usuario:", err);
-    res.status(500).json({ error: "Error al insertar usuario" });
+    console.error("Error al insertar el usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -218,8 +408,11 @@ app.post("/eventos", async (req, res) => {
       evento: result[0],
     });
   } catch (err) {
-    console.error("Error al insertar evento:", err);
-    res.status(500).json({ error: "Error al insertar evento" });
+    console.error("Error al insertar el evento:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -227,24 +420,102 @@ app.post("/eventos", async (req, res) => {
 //Borrar punto de interés
 app.delete("/puntos/:id", async (req, res) => {
   const id = req.params.id;
+
   try {
     const result = await query(
-      "DELETE FROM puntos_interes WHERE ID = $1 RETURNING ID",
+      "DELETE FROM puntos_interes WHERE id = $1 RETURNING id",
       [id]
     );
 
     if (result.length === 0){
       return res.status(404).json({ error: "Punto de interés no encontrado" });
     }
+
     res.status(200).json({
       mensaje: "Punto eliminado correctamente",
       punto_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el punto:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
+
+// Eliminar ruta
+app.delete("/rutas/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "DELETE FROM rutas WHERE id = $1 RETURNING *",
+       [id]
+    );
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Ruta no encontrada" });
+    }
+    res.status(200).json({
+      mensaje: "Ruta eliminada correctamente",
+      ruta_id: result[0].id,
+    });
+  } catch (err) {
+    console.error("Error al eliminar ruta:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+       detalles: err.message 
+    });
+  }
+});
+
+app.delete("/relacion_rutas_puntos/:ruta_id/:punto_id", async (req, res) => {
+  const { ruta_id, punto_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2 RETURNING ruta_id, punto_id",
+      [ruta_id, punto_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Relación no encontrada" });
+    }
+
+    res.status(200).json({
+      mensaje: "Relación eliminada correctamente",
+      relacion: result[0],
+    });
+  } catch (err) {
+    console.error("Error al eliminar relación:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Eliminar todos los puntos de una ruta
+app.delete("/relacion_rutas_puntos/todos/:ruta_id", async (req, res) => {
+  const { ruta_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 RETURNING *",
+      [ruta_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "No se encontraron puntos para esa ruta" });
+    }
+
+    res.status(200).json({
+      mensaje: "Todos los puntos de la ruta eliminados correctamente",
+      ruta_id: ruta_id,
+      puntos_eliminados: result.length
+    });
+  } catch (err) {
+    console.error("Error al eliminar los puntos de la ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
 
 //Borrar evento
 app.delete("/eventos/:id", async (req, res) => {
@@ -263,8 +534,11 @@ app.delete("/eventos/:id", async (req, res) => {
       evento_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el evento:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -285,8 +559,11 @@ app.delete("/usuarios/:id", async (req, res) => {
       usuario_id: result[0].id,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al eliminar el usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -352,9 +629,96 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el punto:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
+
+//actualizar informacion de una ruta especifica
+app.put("/rutas/:id/actualizar", async (req, res) => {
+  const id = req.params.id;
+  const { nombre, descripcion } = req.body;
+  const fieldsToUpdate = [];
+  const values = [];
+
+  if (nombre) {
+    fieldsToUpdate.push('nombre = $' + (fieldsToUpdate.length + 1));
+    values.push(nombre);
+  }
+
+  if (descripcion) {
+    fieldsToUpdate.push('descripcion = $' + (fieldsToUpdate.length + 1));
+    values.push(descripcion);
+  }
+
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+  }
+
+  const queryText = "UPDATE rutas SET " + fieldsToUpdate.join(", ") + 
+                    " WHERE id = $" + (fieldsToUpdate.length + 1) + " RETURNING id, nombre, descripcion, fecha_creacion";
+  values.push(id);
+
+  try {
+    const result = await query(queryText, values);
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Ruta no encontrada" });
+    }
+    res.status(200).json({ mensaje: "Ruta actualizada correctamente", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+//actualizar punto de una ruta
+app.put("/relacion_rutas_puntos/:ruta_id/:punto_id", async (req, res) => {
+  const { ruta_id, punto_id } = req.params;
+  const { nuevo_ruta_id, nuevo_punto_id, orden } = req.body; // nuevos valores opcionales
+  const fieldsToUpdate = [];
+  const values = [];
+
+  if (nuevo_ruta_id) {
+    fieldsToUpdate.push('ruta_id = $' + (fieldsToUpdate.length + 1));
+    values.push(nuevo_ruta_id);
+  }
+
+  if (nuevo_punto_id) {
+    fieldsToUpdate.push('punto_id = $' + (fieldsToUpdate.length + 1));
+    values.push(nuevo_punto_id);
+  }
+
+  if (orden !== undefined) {
+    fieldsToUpdate.push('orden = $' + (fieldsToUpdate.length + 1));
+    values.push(orden);
+  }
+
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+  }
+
+  // Condición para encontrar la fila original
+  const queryText = "UPDATE relacion_rutas_puntos SET " + fieldsToUpdate.join(", ") +
+                    " WHERE ruta_id = $" + (fieldsToUpdate.length + 1) +
+                    " AND punto_id = $" + (fieldsToUpdate.length + 2) +
+                    " RETURNING ruta_id, punto_id, orden";
+  values.push(ruta_id, punto_id);
+
+  try {
+    const result = await query(queryText, values);
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Relación no encontrada" });
+    }
+    res.status(200).json({ mensaje: "Relación actualizada correctamente", relacion: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar relación:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+
 
 //Actualizar eventos
 app.put("/eventos/:id/actualizar", async (req, res) => {
@@ -422,8 +786,12 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el evento:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
+
 });
 
 
@@ -466,8 +834,11 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
       usuario: resultUpdate[0],
     });
   } catch (err) {
-    console.error("Error al actualizar la contraseña:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    console.error("Error al actualizar contraseña del usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
@@ -528,7 +899,10 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar el usuario:", err);
-    res.status(500).json({ error: "Error en la base de datos" });
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
   }
 });
 
