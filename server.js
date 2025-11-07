@@ -50,23 +50,38 @@ app.get("/puntos/:id", async (req, res) => {
 
 
 // Obtener puntos por tipo
-app.get("/puntos/tipo/:tipo", async (req, res) => {
-  const tipo = req.params.tipo;
+app.get("/puntos/tipo/:tipos", async (req, res) => {
+  const tipos = req.params.tipos.split(',');  
+  
+  if (tipos.length === 0) {
+    return res.status(400).json({
+      error: "Debe proporcionar al menos un tipo válido."
+    });
+  }
+
   try {
     const puntos = await query(
-      "SELECT ID, NOMBRE, TIPO,  LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE TIPO = $1",
-      [tipo]
+      "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE TIPO = ANY($1)",
+      [tipos]  
     );
+    
+    if (puntos.length === 0) {
+      return res.status(404).json({
+        error: "No se encontraron puntos para los tipos proporcionados",
+        tipos
+      });
+    }
 
     res.json(puntos);
   } catch (err) {
-    console.error("Error al consultar los puntos de tipo:", err);
-    res.status(500).json({ 
+    console.error("Error al consultar los puntos por tipo:", err);
+    res.status(500).json({
       error: "Error en la base de datos",
-      detalles: err.message 
+      detalles: err.message
     });
   }
 });
+
 
 app.get("/puntos/nombre/:nombre", async (req, res) => {
   const nombre = req.params.nombre;
