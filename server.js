@@ -244,8 +244,7 @@ app.get("/rutas/:id", async (req, res) => {
        LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
        LEFT JOIN puntos_interes p ON r2.punto_id = p.id
        WHERE r.id = $1
-       GROUP BY r.id
-       ORDER BY p.id ASC`,
+       GROUP BY r.id`,
       [id]
     );
 
