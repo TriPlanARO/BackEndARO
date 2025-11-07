@@ -755,16 +755,17 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
 
     res.status(200).json({
       mensaje: "Ruta actualizada correctamente",
-      ruta_actualizada: id,
+      ruta_actualizada: result[0],
     });
 
   } catch (err) {
-    console.error("Error al actualizar ruta:", err);
-    res.status(500).json({
+   console.error("Error al actualizar el evento:", err);
+    res.status(500).json({ 
       error: "Error en la base de datos",
-      detalles: err.message,
+      detalles: err.message 
     });
   }
+  
 });
 
 
