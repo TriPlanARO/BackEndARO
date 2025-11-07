@@ -755,7 +755,7 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
 
     res.status(200).json({
       mensaje: "Ruta actualizada correctamente",
-      ruta_actualizada: result.rows[0],
+      ruta_actualizada: id,
     });
 
   } catch (err) {
