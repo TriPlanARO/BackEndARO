@@ -327,8 +327,8 @@ app.post("/rutas", async (req, res) => {
 
     const nuevaRuta = resultRuta[0];
 
-    const values = puntos.map((punto_id, index) => `($1, $${index + 2}, $${index + 3})`).join(", ");
-    const queryParams = [nuevaRuta.id, ...puntos.map((punto_id, index) => [punto_id, index + 1]).flat()];
+const values = puntos.map((punto_id, index) => `($${index * 2 + 2}, $${index * 2 + 3})`).join(", ");
+const queryParams = puntos.flatMap((punto_id, index) => [nuevaRuta.id, punto_id]);
 
     await query(
       `INSERT INTO relacion_rutas_puntos (ruta_id, punto_id, orden) VALUES ${values}`,
