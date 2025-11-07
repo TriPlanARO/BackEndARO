@@ -353,11 +353,10 @@ app.post("/rutas", async (req, res) => {
 
     for (let i = 0; i < puntos.length; i++) {
       const punto_id = puntos[i];
-      const orden = i + 1; 
 
       await query(
-        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id, orden) VALUES ($1, $2, $3)",
-        [nuevaRuta.id, punto_id, orden]
+        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+        [nuevaRuta.id, punto_id]
       );
     }
 
@@ -372,6 +371,30 @@ app.post("/rutas", async (req, res) => {
   } catch (err) {
     await query("ROLLBACK");
     console.error("Error al crear ruta y añadir puntos:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+app.post("/rutas/:ruta_id/puntos", async (req, res) => {
+  const { ruta_id } = req.params;
+  const { punto_id } = req.body; 
+  if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
+
+  try {
+
+    const result = await query(
+        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+        [ruta_id, punto_id]
+      );
+
+    res.status(201).json({
+      mensaje: "Punto añadido a ruta correctamente",
+      ruta: ruta_id,
+      punto: punto_id
+    });
+
+  } catch (err) {
+    console.error("Error al añadir punto a ruta:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
@@ -515,6 +538,58 @@ app.delete("/rutas/:id", async (req, res) => {
   }
 });
 
+// Eliminar ruta
+app.delete("/rutas/puntos/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE punto_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Punto no encontrado" });
+    }
+    res.status(200).json({
+      mensaje: "Punto eliminado correctamente de la ruta",
+      punto_id: result[0].id,
+    });
+  } catch (err) {
+    console.error("Error al eliminar punto:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+       detalles: err.message 
+    });
+  }
+});
+
+// Eliminar un punto de una ruta específica
+app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
+  const { ruta_id, punto_id } = req.params; // recibimos ambos IDs
+
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2 RETURNING *",
+      [ruta_id, punto_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "No se encontró la relación ruta-punto" });
+    }
+
+    res.status(200).json({
+      mensaje: "Punto eliminado correctamente de la ruta",
+      ruta_id: result[0].ruta_id,
+      punto_id: result[0].punto_id,
+    });
+  } catch (err) {
+    console.error("Error al eliminar punto de la ruta:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
 
 
 //Borrar evento
@@ -636,10 +711,12 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
   }
 });
 
-//actualizar informacion de una ruta especifica
+
 app.put("/rutas/:id/actualizar", async (req, res) => {
-  const id = req.params.id;
+  const { id } = req.params;
   const { nombre, descripcion } = req.body;
+
+  // Inicializamos arrays para construir la query dinámicamente
   const fieldsToUpdate = [];
   const values = [];
 
@@ -654,67 +731,38 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   }
 
   if (fieldsToUpdate.length === 0) {
-    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
+    return res.status(400).json({
+      error: "No se ha proporcionado ningún dato para actualizar",
+    });
   }
 
-  const queryText = "UPDATE rutas SET " + fieldsToUpdate.join(", ") + 
-                    " WHERE id = $" + (fieldsToUpdate.length + 1) + " RETURNING id, nombre, descripcion, fecha_creacion";
   values.push(id);
 
+  const queryText = `
+    UPDATE rutas
+    SET ${fieldsToUpdate.join(", ")}
+    WHERE ruta_id = $${values.length}
+    RETURNING *;
+  `;
+
   try {
     const result = await query(queryText, values);
-    if (result.length === 0) {
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Ruta no encontrada" });
     }
-    res.status(200).json({ mensaje: "Ruta actualizada correctamente", ruta: result[0] });
+
+    res.status(200).json({
+      mensaje: "Ruta actualizada correctamente",
+      ruta_actualizada: result.rows[0],
+    });
+
   } catch (err) {
     console.error("Error al actualizar ruta:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
-  }
-});
-
-//actualizar punto de una ruta
-app.put("/relacion_rutas_puntos/:ruta_id/:punto_id", async (req, res) => {
-  const { ruta_id, punto_id } = req.params;
-  const { nuevo_ruta_id, nuevo_punto_id, orden } = req.body; // nuevos valores opcionales
-  const fieldsToUpdate = [];
-  const values = [];
-
-  if (nuevo_ruta_id) {
-    fieldsToUpdate.push('ruta_id = $' + (fieldsToUpdate.length + 1));
-    values.push(nuevo_ruta_id);
-  }
-
-  if (nuevo_punto_id) {
-    fieldsToUpdate.push('punto_id = $' + (fieldsToUpdate.length + 1));
-    values.push(nuevo_punto_id);
-  }
-
-  if (orden !== undefined) {
-    fieldsToUpdate.push('orden = $' + (fieldsToUpdate.length + 1));
-    values.push(orden);
-  }
-
-  if (fieldsToUpdate.length === 0) {
-    return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
-  }
-
-  // Condición para encontrar la fila original
-  const queryText = "UPDATE relacion_rutas_puntos SET " + fieldsToUpdate.join(", ") +
-                    " WHERE ruta_id = $" + (fieldsToUpdate.length + 1) +
-                    " AND punto_id = $" + (fieldsToUpdate.length + 2) +
-                    " RETURNING ruta_id, punto_id, orden";
-  values.push(ruta_id, punto_id);
-
-  try {
-    const result = await query(queryText, values);
-    if (result.length === 0) {
-      return res.status(404).json({ error: "Relación no encontrada" });
-    }
-    res.status(200).json({ mensaje: "Relación actualizada correctamente", relacion: result[0] });
-  } catch (err) {
-    console.error("Error al actualizar relación:", err);
-    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message,
+    });
   }
 });
 
