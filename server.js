@@ -231,8 +231,20 @@ app.post("/usuarios", async (req, res) => {
   if (!nombre_usuario || !nombre || !apellido || !email || !contraseña || !telefono) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
-
+  
   try {
+    // Verificar si ya existe el usuario o el email
+    const existeUsuario = await query(
+      "SELECT * FROM usuarios WHERE nombre_usuario = $1",
+      [nombre_usuario]
+    );
+
+    if (existeUsuario.length > 0) {
+      return res.status(409).json({
+        error: "El nombre de usuario ya está registrado"
+      });
+    }
+
     const saltRounds = 10; // número de rondas de hashing
     const hashedPassword = await bcrypt.hash(contraseña, saltRounds);
 
