@@ -82,7 +82,7 @@ app.get("/puntos/tipo/:tipos", async (req, res) => {
   }
 });
 
-
+// Obtener puntos por nombre 
 app.get("/puntos/nombre/:nombre", async (req, res) => {
   const nombre = req.params.nombre;
   try {
@@ -194,7 +194,11 @@ app.get("/eventos/:id", async (req, res) => {
 // Obtener todos las rutas
 app.get("/rutas", async (req, res) => {
   try {
-    const rutas = await query("SELECT * FROM rutas");
+    const rutas = await query(
+      `SELECT r.* 
+      FROM rutas r
+      LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
+        LEFT JOIN puntos_interes p ON r2.punto_id = p.id`);
     res.json(rutas);
   } catch (err) {
     console.error("Error al consultar la base de datos de rutas:", err);
@@ -210,10 +214,13 @@ app.get("/rutas/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
-      "SELECT * FROM rutas WHERE id = $1",
+      `SELECT r.* 
+      FROM rutas r
+      LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
+        LEFT JOIN puntos_interes p ON r2.punto_id = p.id
+      WHERE r.id = $1`,
       [id]
     );
-
     if (result.length === 0) {
       // No se encontró el ID
       return res.status(404).json({ error: `No se encontró la ruta con ID ${id}` });
@@ -437,6 +444,7 @@ app.delete("/puntos/:id", async (req, res) => {
   const id = req.params.id;
 
   try {
+    await query("DELETE FROM eventos WHERE punto_id = $1", [id]);
     const result = await query(
       "DELETE FROM puntos_interes WHERE id = $1 RETURNING id",
       [id]
