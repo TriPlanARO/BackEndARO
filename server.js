@@ -199,7 +199,7 @@ app.get("/rutas", async (req, res) => {
       FROM rutas r
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
-      GROUP BY r.id
+      GROUP BY r.id, p.id
       ORDER BY p.id ASC`);
     res.json(rutas);
   } catch (err) {
@@ -221,7 +221,7 @@ app.get("/rutas/:id", async (req, res) => {
       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
         LEFT JOIN puntos_interes p ON r2.punto_id = p.id
       WHERE r.id = $1
-      GROUP BY r.id
+      GROUP BY r.id, p.id
       ORDER BY p.id ASC`,
       [id]
     );
