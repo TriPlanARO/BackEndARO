@@ -446,6 +446,25 @@ app.post("/usuarios", async (req, res) => {
   }
 });
 
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const usuarios = await query("SELECT * FROM usuarios WHERE email = $1", [email]);
+    if (usuarios.length === 0) return res.status(401).json({ error: "Email incorrecto" });
+
+    const usuario = usuarios[0];
+    const match = await bcrypt.compare(password, usuario.contrasena);
+    if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
+
+    res.json({ nombre: usuario.nombre, id: usuario.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+
 // Añadir nuevo evento (POST) con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body;
