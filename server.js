@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json()); // para procesar JSON
 const port = process.env.PORT || 10000;
 
-// -------------------- RUTAS PUNTOS --------------------
+//-------------------- GETS --------------------
 
 // Obtener todos los puntos de interés
 app.get("/puntos", async (req, res) => {
@@ -47,7 +47,6 @@ app.get("/puntos/:id", async (req, res) => {
     });
   }
 });
-
 
 // Obtener puntos por tipo
 app.get("/puntos/tipo/:tipos", async (req, res) => {
@@ -98,8 +97,6 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
 });
 
 
-// -------------------- RUTAS USUARIOS --------------------
-
 // Obtener todos los usuarios
 app.get("/usuarios", async (req, res) => {
   try {
@@ -140,7 +137,30 @@ app.get("/usuarios/:id", async (req, res) => {
   }
 });
 
-// -------------------- RUTAS EVENTOS --------------------
+// Obtener usuario por email
+app.get("/usuarios/email/:email", async (req, res) => {
+  const email = req.params.email;
+  try {
+    const usuario = await query(
+      "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios WHERE email = $1",
+      [email]
+    );
+
+    if (usuario.length === 0) {
+      // No se encontró el ID
+      return res.status(404).json({ error: `No se encontró el usuario con email ${email}` });
+    } 
+
+    res.json(usuario);
+  } catch (err) {
+    console.error("Error al seleccionar el usuario con email:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
 
 // Obtener todos los eventos
 app.get("/eventos", async (req, res) => {
@@ -189,7 +209,6 @@ app.get("/eventos/:id", async (req, res) => {
   }
 });
 
-// -------------------- RUTAS --------------------
 
 // Obtener todos las rutas
 app.get("/rutas", async (req, res) => {
@@ -266,7 +285,7 @@ app.get("/rutas/:id", async (req, res) => {
 
 //---------------------POSTS ----------------------
 
-//Añadir puntos con POST
+//Añadir punto 
 app.post("/puntos", async (req, res) => {
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body;
 
@@ -328,6 +347,7 @@ app.post("/puntos/tipo", async (req, res) => {
 });
 
 
+// Añadir una nueva ruta
 app.post("/rutas", async (req, res) => {
   const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs de los puntos
   if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
@@ -375,6 +395,7 @@ app.post("/rutas", async (req, res) => {
   }
 });
 
+//Añadir un nuevo punto a una ruta
 app.post("/rutas/:ruta_id/puntos", async (req, res) => {
   const { ruta_id } = req.params;
   const { punto_id } = req.body; 
@@ -400,7 +421,7 @@ app.post("/rutas/:ruta_id/puntos", async (req, res) => {
 });
 
 
-// Añadir usuario con POST
+// Añadir usuario 
 app.post("/usuarios", async (req, res) => {
   const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
 
@@ -412,13 +433,13 @@ app.post("/usuarios", async (req, res) => {
   try {
     // Verificar si ya existe el usuario o el email
     const existeUsuario = await query(
-      "SELECT * FROM usuarios WHERE nombre_usuario = $1",
-      [nombre_usuario]
+      "SELECT * FROM usuarios WHERE email = $1",
+      [email]
     );
 
     if (existeUsuario.length > 0) {
       return res.status(409).json({
-        error: "El nombre de usuario ya está registrado"
+        error: "El email ya está registrado"
       });
     }
 
@@ -446,6 +467,7 @@ app.post("/usuarios", async (req, res) => {
   }
 });
 
+//Comprobar credenciales login
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -465,7 +487,7 @@ app.post("/login", async (req, res) => {
 });
 
 
-// Añadir nuevo evento (POST) con fecha_fin opcional
+// Añadir nuevo evento con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body;
 
@@ -497,7 +519,8 @@ app.post("/eventos", async (req, res) => {
 });
 
 //--------------------- DELETES ----------------------
-//Borrar punto de interés
+
+//Borrar punto de interés, borrando referencias de eventos y rutas
 app.delete("/puntos/:id", async (req, res) => {
   const id = req.params.id;
 
@@ -557,7 +580,7 @@ app.delete("/rutas/:id", async (req, res) => {
   }
 });
 
-// Eliminar ruta
+// Eliminar punto de todas las rutas
 app.delete("/rutas/puntos/:id", async (req, res) => {
   const id = req.params.id;
   try {
@@ -610,7 +633,6 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
 });
 
 
-
 //Borrar evento
 app.delete("/eventos/:id", async (req, res) => {
   const id = req.params.id;
@@ -635,6 +657,7 @@ app.delete("/eventos/:id", async (req, res) => {
     });
   }
 });
+
 
 //Borrar usuario
 app.delete("/usuarios/:id", async (req, res) => {
@@ -661,7 +684,9 @@ app.delete("/usuarios/:id", async (req, res) => {
   }
 });
 
+
 //--------------------- UPDATES ----------------------
+
 //Actualizar puntos de interés
 app.put("/puntos/:id/actualizar", async (req, res) => {
   const id = req.params.id; 
@@ -708,7 +733,6 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
   queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, latitud, longitud, descripcion, imagen ";
   values.push(id);
 
-
   try {
 
     const result = await query(queryText, values);
@@ -730,7 +754,7 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
   }
 });
 
-
+//Actualizar rutas
 app.put("/rutas/:id/actualizar", async (req, res) => {
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
@@ -863,7 +887,7 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
 });
 
 
-//Update de la contraseña de un usuario
+//Actualizar la contraseña de un usuario
 app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
   const id = req.params.id; 
   const { nueva_contraseña, vieja_contraseña } = req.body; 
