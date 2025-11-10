@@ -64,7 +64,7 @@ app.get("/puntos/tipo/:tipos", async (req, res) => {
       [tipos]  
     );
     
-    if (puntos.rows.length === 0) {
+    if (puntos.length === 0) {
       return res.status(404).json({
         error: "No se encontraron puntos para los tipos proporcionados",
         tipos
