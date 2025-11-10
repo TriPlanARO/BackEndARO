@@ -63,13 +63,6 @@ app.get("/puntos/tipo/:tipos", async (req, res) => {
       "SELECT ID, NOMBRE, TIPO, LATITUD, LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes WHERE TIPO = ANY($1)",
       [tipos]  
     );
-    
-    if (puntos.length === 0) {
-      return res.status(404).json({
-        error: "No se encontraron puntos para los tipos proporcionados",
-        tipos
-      });
-    }
 
     res.json(puntos);
   } catch (err) {
