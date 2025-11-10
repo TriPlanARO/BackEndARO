@@ -957,7 +957,7 @@ app.delete("/rutas/puntos/:id", async (req, res) => {
       return res.status(404).json({ error: "Punto no encontrado" });
     }
     res.status(200).json({
-      mensaje: "Punto eliminado correctamente de la ruta",
+      mensaje: "Punto eliminado correctamente de todas las rutas",
       punto_id: result[0].id,
     });
   } catch (err) {
