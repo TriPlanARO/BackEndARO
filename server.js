@@ -587,8 +587,8 @@ app.post("/eventos", async (req, res) => {
   try {
     // Verificar si ya existe el evento
     const existeEvento = await query(
-      "SELECT * FROM eventos WHERE nombre = $1 AND punto_id = $2 AND fecha_ini=$3",
-      [email,punto_id,fecha_ini]
+      "SELECT * FROM eventos WHERE nombre = $1 AND punto_id = $2 AND fecha_ini=$3 AND tipo=$4",
+      [nombre,punto_id,fecha_ini,tipo]
     );
 
     if (existeEvento.length > 0) {
