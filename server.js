@@ -531,9 +531,20 @@ app.delete("/usuarios/:id", async (req, res) => {
 app.get("/eventos", async (req, res) => {
   try {
     const eventos = await query(`
-      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+        CASE
+          WHEN e.punto_id IS NOT NULL THEN json_build_object(
+            'id', p.id,
+            'nombre', p.nombre,
+            'tipo', p.tipo,
+            'latitud', p.latitud,
+            'longitud', p.longitud,
+            'descripcion', p.descripcion,
+            'imagen', p.imagen
+          )
+        END AS punto
       FROM eventos e
-      INNER JOIN puntos_interes p ON e.punto_id = p.id
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
       ORDER BY e.id;
     `);
     res.json(eventos);
@@ -551,13 +562,25 @@ app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-    `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+        CASE 
+          WHEN e.punto_id IS NOT NULL THEN json_build_object(
+            'id', p.id,
+            'nombre', p.nombre,
+            'tipo', p.tipo,
+            'latitud', p.latitud,
+            'longitud', p.longitud,
+            'descripcion', p.descripcion,
+            'imagen', p.imagen
+          )
+        END AS punto
       FROM eventos e
-      INNER JOIN puntos_interes p ON e.punto_id = p.id
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
       WHERE e.id = $1
       ORDER BY e.id;`,
       [id]
     );
+
 
     if (evento.length === 0) {
       // No se encontró el ID
@@ -579,7 +602,7 @@ app.get("/eventos/:id", async (req, res) => {
 // Obtener eventos por tipo
 app.get("/eventos/tipo/:tipos", async (req, res) => {
 
-  const tipos = req.params.tipos.split(',');   // solo un tipo, no array
+  const tipos = req.params.tipos.split(',');
 
   if (tipos.length === 0) {
     return res.status(400).json({
@@ -590,21 +613,24 @@ app.get("/eventos/tipo/:tipos", async (req, res) => {
   try {
     const eventos = await query(
       `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
-              json_build_object(
-                'id', p.id,
-                'nombre', p.nombre,
-                'tipo', p.tipo,
-                'latitud', p.latitud,
-                'longitud', p.longitud,
-                'descripcion', p.descripcion,
-                'imagen', p.imagen
-              ) AS punto
-       FROM eventos e
-       INNER JOIN puntos_interes p ON e.punto_id = p.id
-       WHERE e.tipo = ANY($1)
-       ORDER BY e.id`,
+              CASE
+                WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                  'id', p.id,
+                  'nombre', p.nombre,
+                  'tipo', p.tipo,
+                  'latitud', p.latitud,
+                  'longitud', p.longitud,
+                  'descripcion', p.descripcion,
+                  'imagen', p.imagen
+                )
+              END AS punto
+      FROM eventos e
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
+      WHERE e.tipo = ANY($1)
+      ORDER BY e.id`,
       [tipos]
     );
+
 
     res.json(eventos);
   } catch (err) {
@@ -629,19 +655,21 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
   try {
     const eventos = await query(
       `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
-              json_build_object(
-                'id', p.id,
-                'nombre', p.nombre,
-                'tipo', p.tipo,
-                'latitud', p.latitud,
-                'longitud', p.longitud,
-                'descripcion', p.descripcion,
-                'imagen', p.imagen
-              ) AS punto
-       FROM eventos e
-       INNER JOIN puntos_interes p ON e.punto_id = p.id
-       WHERE e.nombre ILIKE $1
-       ORDER BY e.id`,
+              CASE
+                WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                  'id', p.id,
+                  'nombre', p.nombre,
+                  'tipo', p.tipo,
+                  'latitud', p.latitud,
+                  'longitud', p.longitud,
+                  'descripcion', p.descripcion,
+                  'imagen', p.imagen
+                )
+              END AS punto
+      FROM eventos e
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
+      WHERE e.nombre ILIKE $1
+      ORDER BY e.id`,
       [`%${nombre}%`] // búsqueda parcial, insensible a mayúsculas
     );
 
@@ -822,8 +850,8 @@ app.get("/rutas", async (req, res) => {
                 )
               ) AS puntos_interes
        FROM rutas r
-       INNER JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
-       INNER JOIN puntos_interes p ON r2.punto_id = p.id
+       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
+       LEFT JOIN puntos_interes p ON r2.punto_id = p.id
        GROUP BY r.id
        ORDER BY r.id ASC`
     );
@@ -855,8 +883,8 @@ app.get("/rutas/:id", async (req, res) => {
                 )
               ) AS puntos_interes
        FROM rutas r
-       INNER JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
-       INNER JOIN puntos_interes p ON r2.punto_id = p.id
+       LEFT JOIN relacion_rutas_puntos r2 ON r.id = r2.ruta_id
+       LEFT JOIN puntos_interes p ON r2.punto_id = p.id
        WHERE r.id = $1
        GROUP BY r.id`,
       [id]
