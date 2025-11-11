@@ -585,6 +585,17 @@ app.post("/eventos", async (req, res) => {
   }
 
   try {
+    // Verificar si ya existe el evento
+    const existeEvento = await query(
+      "SELECT * FROM eventos WHERE nombre = $1 AND punto_id = $2 AND fecha_ini=$3",
+      [email,punto_id,fecha_ini]
+    );
+
+    if (existeEvento.length > 0) {
+      return res.status(409).json({
+        error: "El evento ya está registrado con el mismo nombre y punto en la fecha"
+      });
+    }
     // Insertar el evento
     const result = await query(
       `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id)
