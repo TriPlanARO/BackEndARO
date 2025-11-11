@@ -577,12 +577,13 @@ app.get("/eventos/:id", async (req, res) => {
 
 
 // Obtener eventos por tipo
-app.get("/eventos/tipo/:tipo", async (req, res) => {
-  const tipo = req.params.tipo; // solo un tipo, no array
+app.get("/eventos/tipo/:tipos", async (req, res) => {
 
-  if (!tipo) {
+  const tipos = req.params.tipos.split(',');   // solo un tipo, no array
+
+  if (tipos.length === 0) {
     return res.status(400).json({
-      error: "Debe proporcionar un tipo válido."
+      error: "Debe proporcionar al menos un tipo válido."
     });
   }
 
@@ -600,9 +601,9 @@ app.get("/eventos/tipo/:tipo", async (req, res) => {
               ) AS punto
        FROM eventos e
        LEFT JOIN puntos_interes p ON e.punto_id = p.id
-       WHERE e.tipo = $1
+       WHERE e.tipo = ANY($1)
        ORDER BY e.id`,
-      [tipo]
+      [tipos]
     );
 
     res.json(eventos);
