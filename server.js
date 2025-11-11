@@ -795,46 +795,78 @@ app.get("/rutas/:id", async (req, res) => {
 });
 //-------------------- POST 
 
-// Añadir una nueva ruta
+// Añadir una nueva ruta con puntos, evitando duplicados
 app.post("/rutas", async (req, res) => {
-  const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs de los puntos
+  const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs
+
   if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
 
-  // Validación de que los puntos sean un array y que contengan al menos un punto
+  // Validación de puntos
   if (puntos && !Array.isArray(puntos)) {
     return res.status(400).json({ error: "Los puntos deben ser un array" });
   }
 
-  if (puntos && puntos.length === 0) {
-    return res.status(400).json({ error: "Debe haber al menos un punto asociado a la ruta" });
-  }
-
   try {
+    // Verificar si ya existe una ruta con el mismo nombre
+    const existeRuta = await query(
+      "SELECT * FROM rutas WHERE nombre = $1",
+      [nombre]
+    );
 
+    if (existeRuta.length > 0) {
+      return res.status(409).json({
+        error: "Ya existe una ruta con ese nombre",
+        ruta_id: existeRuta[0].id
+      });
+    }
+
+    // Crear la nueva ruta
     const resultRuta = await query(
       "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
       [nombre, descripcion || null]
     );
 
     const nuevaRuta = resultRuta[0];
-    await query("BEGIN");
 
-    for (let i = 0; i < puntos.length; i++) {
-      const punto_id = puntos[i];
+    if (puntos && puntos.length > 0) {
+      await query("BEGIN");
 
-      await query(
-        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
-        [nuevaRuta.id, punto_id]
-      );
+      const añadidos = [];
+      const duplicados = [];
+
+      for (const punto_id of puntos) {
+        // Verificar si ya existe la relación
+        const existe = await query(
+          "SELECT * FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2",
+          [nuevaRuta.id, punto_id]
+        );
+
+        if (existe.length > 0) {
+          duplicados.push(punto_id);
+        } else {
+          await query(
+            "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+            [nuevaRuta.id, punto_id]
+          );
+          añadidos.push(punto_id);
+        }
+      }
+
+      await query("COMMIT");
+
+      res.status(201).json({
+        mensaje: "Ruta y puntos añadidos correctamente",
+        ruta: nuevaRuta,
+        puntos_añadidos: añadidos,
+        puntos_duplicados: duplicados
+      });
+    } else {
+      res.status(201).json({
+        mensaje: "Ruta añadida correctamente",
+        ruta: nuevaRuta,
+        puntos_asociados: []
+      });
     }
-
-    await query("COMMIT");
-
-    res.status(201).json({
-      mensaje: "Ruta y puntos añadidos correctamente",
-      ruta: nuevaRuta,
-      puntos_asociados: puntos || []
-    });
 
   } catch (err) {
     await query("ROLLBACK");
@@ -843,30 +875,53 @@ app.post("/rutas", async (req, res) => {
   }
 });
 
-//Añadir un nuevo punto a una ruta
+
+// Añadir uno o varios puntos a una ruta, evitando duplicados
 app.post("/rutas/:ruta_id/puntos", async (req, res) => {
   const { ruta_id } = req.params;
-  const { punto_id } = req.body; 
+  let { punto_id } = req.body; 
+
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
 
-  try {
+  // Asegurarnos de que sea un array
+  if (!Array.isArray(punto_id)) {
+    punto_id = [punto_id];
+  }
 
-    const result = await query(
-        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
-        [ruta_id, punto_id]
+  try {
+    const añadidos = [];
+    const duplicados = [];
+
+    for (const id of punto_id) {
+      // Verificar si ya existe la relación
+      const existe = await query(
+        "SELECT * FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2",
+        [ruta_id, id]
       );
 
+      if (existe.length > 0) {
+        duplicados.push(id);
+      } else {
+        await query(
+          "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+          [ruta_id, id]
+        );
+        añadidos.push(id);
+      }
+    }
+
     res.status(201).json({
-      mensaje: "Punto añadido a ruta correctamente",
-      ruta: ruta_id,
-      punto: punto_id
+      mensaje: "Proceso finalizado",
+      añadidos,
+      duplicados
     });
 
   } catch (err) {
-    console.error("Error al añadir punto a ruta:", err);
+    console.error("Error al añadir puntos a ruta:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 //-------------------- PUT 
 //Actualizar rutas
