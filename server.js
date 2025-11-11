@@ -879,7 +879,7 @@ app.post("/rutas", async (req, res) => {
 // Añadir uno o varios puntos a una ruta, evitando duplicados
 app.post("/rutas/:ruta_id/puntos", async (req, res) => {
   const { ruta_id } = req.params;
-  let { punto_id } = req.body; 
+  const { punto_id } = req.body; 
 
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
 
