@@ -574,44 +574,34 @@ app.get("/eventos/:id", async (req, res) => {
   }
 });
 
-// Obtener eventos por nombre
-app.get("/eventos/nombre/:nombre", async (req, res) => {
-  const nombre = req.params.nombre;
-
-  try {
-    const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
-              json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
-       FROM eventos e
-       LEFT JOIN puntos_interes p ON e.punto_id = p.id
-       WHERE e.nombre ILIKE $1
-       ORDER BY e.id;`,
-      [`%${nombre}%`] // % para búsqueda parcial
-    );
-
-    res.json(eventos);
-  } catch (err) {
-    console.error("Error al consultar los eventos por nombre:", err);
-    res.status(500).json({
-      error: "Error en la base de datos",
-      detalles: err.message
-    });
-  }
-});
 
 
 // Obtener eventos por tipo
 app.get("/eventos/tipo/:tipo", async (req, res) => {
-  const tipo = req.params.tipo;
+  const tipo = req.params.tipo; // solo un tipo, no array
+
+  if (!tipo) {
+    return res.status(400).json({
+      error: "Debe proporcionar un tipo válido."
+    });
+  }
 
   try {
     const eventos = await query(
       `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
-              json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) AS punto
+              json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'tipo', p.tipo,
+                'latitud', p.latitud,
+                'longitud', p.longitud,
+                'descripcion', p.descripcion,
+                'imagen', p.imagen
+              ) AS punto
        FROM eventos e
        LEFT JOIN puntos_interes p ON e.punto_id = p.id
        WHERE e.tipo = $1
-       ORDER BY e.id;`,
+       ORDER BY e.id`,
       [tipo]
     );
 
@@ -624,6 +614,46 @@ app.get("/eventos/tipo/:tipo", async (req, res) => {
     });
   }
 });
+
+// Obtener eventos por nombre
+app.get("/eventos/nombre/:nombre", async (req, res) => {
+  const nombre = req.params.nombre;
+
+  if (!nombre) {
+    return res.status(400).json({
+      error: "Debe proporcionar un nombre válido."
+    });
+  }
+
+  try {
+    const eventos = await query(
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+              json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'tipo', p.tipo,
+                'latitud', p.latitud,
+                'longitud', p.longitud,
+                'descripcion', p.descripcion,
+                'imagen', p.imagen
+              ) AS punto
+       FROM eventos e
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE e.nombre ILIKE $1
+       ORDER BY e.id`,
+      [`%${nombre}%`] // búsqueda parcial, insensible a mayúsculas
+    );
+
+    res.json(eventos);
+  } catch (err) {
+    console.error("Error al consultar los eventos por nombre:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
 
 
 //-------------------- POST
