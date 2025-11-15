@@ -683,6 +683,60 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
   }
 });
 
+// Obtener eventos por fecha
+app.get("/eventos/fecha/:fecha", async (req, res) => {
+  const fecha = req.params.fecha;
+  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!fecha || !regexFecha.test(fecha)) {
+    return res.status(400).json({
+      error: "Debe proporcionar una fecha válida (en formato YYYY-MM-DD)."
+    });
+  }
+
+
+  const fechaObj = new Date(fecha);
+  const fechaValida =
+    fechaObj instanceof Date &&
+    !isNaN(fechaObj) &&
+    fechaObj.toISOString().startsWith(fecha);
+
+  if (!fechaValida) {
+    return res.status(400).json({
+      error: "La fecha proporcionada no existe."
+    });
+  }
+
+  try {
+    const eventos = await query(
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE
+                WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                  'id', p.id,
+                  'nombre', p.nombre,
+                  'tipo', p.tipo,
+                  'latitud', p.latitud,
+                  'longitud', p.longitud,
+                  'descripcion', p.descripcion,
+                  'imagen', p.imagen
+                )
+              END AS punto
+      FROM eventos e
+      LEFT JOIN puntos_interes p ON e.punto_id = p.id
+      WHERE $1::date BETWEEN e.fecha_ini::date AND COALESCE(e.fecha_fin::date, e.fecha_ini::date) 
+      ORDER BY e.id`,
+      [fecha] //COALESCE coge el primer valor no nulo, si el fin es null, comparará solo si la fecha ocurre el día de fecha_ini
+    );
+
+    res.json(eventos);
+  } catch (err) {
+    console.error("Error al consultar los eventos por fecha:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
 
 
 //-------------------- POST
