@@ -531,7 +531,7 @@ app.delete("/usuarios/:id", async (req, res) => {
 app.get("/eventos", async (req, res) => {
   try {
     const eventos = await query(`
-      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
         CASE
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -562,7 +562,7 @@ app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
         CASE 
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -612,7 +612,7 @@ app.get("/eventos/tipo/:tipos", async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -654,7 +654,7 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -688,7 +688,7 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
 //-------------------- POST
 // Añadir nuevo evento con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
-  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body;
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, enlace, punto_id } = req.body;
 
   // Validar campos obligatorios
   if (!nombre || !tipo || !fecha_ini) {
@@ -699,7 +699,7 @@ app.post("/eventos", async (req, res) => {
     // Verificar si ya existe el evento
     const existeEvento = await query(
       "SELECT * FROM eventos WHERE nombre = $1 AND punto_id = $2 AND fecha_ini=$3 AND tipo=$4",
-      [nombre,punto_id,fecha_ini,tipo]
+      [nombre, punto_id, fecha_ini, tipo]
     );
 
     if (existeEvento.length > 0) {
@@ -709,10 +709,10 @@ app.post("/eventos", async (req, res) => {
     }
     // Insertar el evento
     const result = await query(
-      `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id`,
-      [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null]
+      [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null, enlace || null]
     );
 
     res.status(201).json({
@@ -732,7 +732,7 @@ app.post("/eventos", async (req, res) => {
 //Actualizar eventos
 app.put("/eventos/:id/actualizar", async (req, res) => {
   const id = req.params.id; 
-  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id } = req.body; 
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace } = req.body; 
   const fieldsToUpdate = [];
   const values = [];
 
@@ -773,11 +773,16 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
     values.push(punto_id);
   }
 
+  if (enlace) {
+    fieldsToUpdate.push('enlace = $' + (fieldsToUpdate.length + 1));
+    values.push(enlace);
+  }
+
   if (fieldsToUpdate.length === 0) {
     return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
   }
 
-  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id";
+  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace";
   values.push(id);
 
 
@@ -933,7 +938,7 @@ app.post("/rutas", async (req, res) => {
 
     // Crear la nueva ruta
     const resultRuta = await query(
-      "INSERT INTO rutas (nombre, descripcion, fecha_creacion) VALUES ($1, $2, NOW()) RETURNING *",
+      "INSERT INTO rutas (nombre, descripcion) VALUES ($1, $2) RETURNING *",
       [nombre, descripcion || null]
     );
 
