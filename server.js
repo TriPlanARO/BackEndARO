@@ -321,6 +321,79 @@ app.get("/usuarios/email/:email", async (req, res) => {
   }
 });
 
+// Obtener todas las rutas personalizadas de un usuario
+app.get("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
+  const { usuario_id } = req.params;
+  try {
+    const rutas = await query(
+      `SELECT r.*, 
+              json_agg(
+                json_build_object(
+                  'id', p.id, 
+                  'nombre', p.nombre, 
+                  'tipo', p.tipo, 
+                  'latitud', p.latitud, 
+                  'longitud', p.longitud, 
+                  'descripcion', p.descripcion, 
+                  'imagen', p.imagen
+                )
+              ) AS puntos_interes
+       FROM rutas_personalizadas r
+       LEFT JOIN relacion_rutas_personalizadas_puntos r2 
+              ON r.id = r2.ruta_id AND r2.usuario_id=$1
+       LEFT JOIN puntos_interes p 
+              ON r2.punto_id = p.id
+       WHERE r.usuario_id=$1
+       GROUP BY r.id
+       ORDER BY r.id ASC`,
+      [usuario_id]
+    );
+    res.json(rutas);
+  } catch (err) {
+    console.error("Error al consultar rutas personalizadas de usuario:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Obtener una ruta personalizada por ID y usuario
+app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  try {
+    const result = await query(
+      `SELECT r.*, 
+              json_agg(
+                json_build_object(
+                  'id', p.id, 
+                  'nombre', p.nombre, 
+                  'tipo', p.tipo, 
+                  'latitud', p.latitud, 
+                  'longitud', p.longitud, 
+                  'descripcion', p.descripcion, 
+                  'imagen', p.imagen
+                )
+              ) AS puntos_interes
+       FROM rutas_personalizadas r
+       LEFT JOIN relacion_rutas_personalizadas_puntos r2 
+              ON r.id = r2.ruta_id AND r2.usuario_id=$1
+       LEFT JOIN puntos_interes p 
+              ON r2.punto_id = p.id
+       WHERE r.id=$2 AND r.usuario_id=$1
+       GROUP BY r.id`,
+      [usuario_id, ruta_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Ruta personalizada no encontrada" });
+    }
+
+    res.json(result[0]);
+  } catch (err) {
+    console.error("Error al obtener ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+
 //-------------------- POST
 // Añadir usuario 
 app.post("/usuarios", async (req, res) => {
@@ -384,6 +457,154 @@ app.post("/login", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Crear nueva ruta personalizada con puntos y calcular duración
+app.post("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
+  const { usuario_id } = req.params;
+  const { nombre, descripcion, puntos } = req.body; // puntos es array de IDs
+
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
+  if (puntos && !Array.isArray(puntos)) return res.status(400).json({ error: "Los puntos deben ser un array" });
+
+  try {
+    // Evitar duplicar nombres para el mismo usuario
+    const existe = await query(
+      "SELECT * FROM rutas_personalizadas WHERE nombre=$1 AND usuario_id=$2",
+      [nombre, usuario_id]
+    );
+    if (existe.length > 0) {
+      return res.status(409).json({ error: "Ya existe una ruta personalizada con ese nombre para este usuario" });
+    }
+
+    // Crear ruta
+    const resultRuta = await query(
+      "INSERT INTO rutas_personalizadas (usuario_id, nombre, descripcion) VALUES ($1,$2,$3) RETURNING *",
+      [usuario_id, nombre, descripcion || null]
+    );
+    const nuevaRuta = resultRuta[0];
+
+    if (puntos && puntos.length > 0) {
+      await query("BEGIN");
+
+      const añadidos = [];
+      const duplicados = [];
+
+      for (const punto_id of puntos) {
+        // Verificar si ya existe la relación
+        const existeRel = await query(
+          "SELECT * FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3",
+          [nuevaRuta.id, usuario_id, punto_id]
+        );
+        if (existeRel.length > 0) duplicados.push(punto_id);
+        else {
+          await query(
+            "INSERT INTO relacion_rutas_personalizadas_puntos (ruta_id, usuario_id, punto_id) VALUES ($1,$2,$3)",
+            [nuevaRuta.id, usuario_id, punto_id]
+          );
+          añadidos.push(punto_id);
+        }
+      }
+
+      await query("COMMIT");
+
+      // Actualizar duración
+      const updateDuracionQuery = `
+        UPDATE rutas_personalizadas
+        SET duracion = COALESCE(ROUND((
+          WITH puntos_ruta AS (
+            SELECT p.id, p.latitud, p.longitud
+            FROM relacion_rutas_personalizadas_puntos rp
+            JOIN puntos_interes p ON p.id = rp.punto_id
+            WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+          )
+          SELECT SUM(min_dist)
+          FROM (
+            SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+            FROM puntos_ruta p1
+            JOIN puntos_ruta p2 ON p1.id<>p2.id
+            GROUP BY p1.id
+          ) sub
+        )/5*60),0)
+        WHERE id=$1 AND usuario_id=$2
+        RETURNING duracion;
+      `;
+      const duracionResult = await query(updateDuracionQuery, [nuevaRuta.id, usuario_id]);
+
+      res.status(201).json({
+        mensaje: "Ruta personalizada creada y duración calculada",
+        ruta: { ...nuevaRuta, duracion: duracionResult[0].duracion },
+        puntos_añadidos: añadidos,
+        puntos_duplicados: duplicados
+      });
+    } else {
+      res.status(201).json({ mensaje: "Ruta personalizada creada", ruta: nuevaRuta, duracion: 0 });
+    }
+
+  } catch (err) {
+    await query("ROLLBACK");
+    console.error("Error al crear ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Añadir un punto a una ruta personalizada existente
+app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos", async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  const { punto_id } = req.body;
+  if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
+
+  try {
+    // Verificar existencia del punto
+    const puntoRes = await query("SELECT latitud,longitud FROM puntos_interes WHERE id=$1", [punto_id]);
+    if (!puntoRes || puntoRes.length === 0) return res.status(404).json({ error: "Punto no encontrado" });
+
+    // Insertar relación, evitando duplicado
+    const existeRel = await query(
+      "SELECT * FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3",
+      [ruta_id, usuario_id, punto_id]
+    );
+    if (existeRel.length > 0) return res.status(409).json({ error: "Punto ya añadido a esta ruta" });
+
+    await query(
+      "INSERT INTO relacion_rutas_personalizadas_puntos (ruta_id, usuario_id, punto_id) VALUES ($1,$2,$3)",
+      [ruta_id, usuario_id, punto_id]
+    );
+
+    // Recalcular duración
+    const updateDuracionQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING duracion;
+    `;
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, usuario_id]);
+
+    res.status(201).json({
+      mensaje: "Punto añadido y duración actualizada",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
+    });
+
+  } catch (err) {
+    console.error("Error al añadir punto a ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
@@ -497,6 +718,68 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
   }
 });
 
+// Actualizar ruta personalizada (nombre, descripcion)
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  const { nombre, descripcion } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (nombre) { fields.push(`nombre=$${fields.length+1}`); values.push(nombre); }
+  if (descripcion) { fields.push(`descripcion=$${fields.length+1}`); values.push(descripcion); }
+  if (fields.length === 0) return res.status(400).json({ error: "No se proporcionó dato a actualizar" });
+
+  values.push(ruta_id, usuario_id);
+
+  const queryText = `UPDATE rutas_personalizadas SET ${fields.join(", ")} WHERE id=$${values.length-1} AND usuario_id=$${values.length} RETURNING *`;
+
+  try {
+    const result = await query(queryText, values);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+    res.status(200).json({ mensaje: "Ruta personalizada actualizada", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Actualizar duración de ruta personalizada
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion", async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+
+  try {
+    const updateQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING id,duracion;
+    `;
+    const result = await query(updateQuery, [ruta_id, usuario_id]);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+
+    res.status(200).json({ mensaje: "Duración actualizada", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar duración de ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+
 //-------------------- DELETE
 //Borrar usuario
 app.delete("/usuarios/:id", async (req, res) => {
@@ -520,6 +803,66 @@ app.delete("/usuarios/:id", async (req, res) => {
       error: "Error en la base de datos",
       detalles: err.message 
     });
+  }
+});
+
+// Eliminar ruta personalizada
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  try {
+    await query("DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2", [ruta_id, usuario_id]);
+    const result = await query("DELETE FROM rutas_personalizadas WHERE id=$1 AND usuario_id=$2 RETURNING *", [ruta_id, usuario_id]);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+    res.status(200).json({ mensaje: "Ruta personalizada eliminada", ruta_id });
+  } catch (err) {
+    console.error("Error al eliminar ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Eliminar un punto de una ruta personalizada
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id", async (req, res) => {
+  const { usuario_id, ruta_id, punto_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3 RETURNING *",
+      [ruta_id, usuario_id, punto_id]
+    );
+    if (!result || result.length === 0) return res.status(404).json({ error: "Relación ruta-punto no encontrada" });
+
+    // Recalcular duración
+    const updateDuracionQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING duracion;
+    `;
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, usuario_id]);
+
+    res.status(200).json({
+      mensaje: "Punto eliminado y duración actualizada",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
+    });
+  } catch (err) {
+    console.error("Error al eliminar punto de ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
