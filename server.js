@@ -1045,31 +1045,61 @@ app.post("/rutas", async (req, res) => {
   }
 });
 
-
-//Añadir un nuevo punto a una ruta
+//Insertar uun punto a una ruta especifica (se actualiza su duracion sumandole el tiempo del punto añadido)
 app.post("/rutas/:ruta_id/puntos", async (req, res) => {
   const { ruta_id } = req.params;
   const { punto_id } = req.body; 
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
 
   try {
+    // Obtener coordenadas del nuevo punto
+    const nuevoPuntoResult = await query(
+      "SELECT latitud, longitud FROM puntos_interes WHERE id = $1",
+      [punto_id]
+    );
 
-    const result = await query(
-        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
-        [ruta_id, punto_id]
-      );
+    if (!nuevoPuntoResult || nuevoPuntoResult.length === 0) {
+      return res.status(404).json({ error: "Punto no encontrado" });
+    }
+
+    const { latitud: lat_np, longitud: lon_np } = nuevoPuntoResult[0];
+
+    // Insertar el nuevo punto en la ruta
+    await query(
+      "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+      [ruta_id, punto_id]
+    );
+
+    // Actualizar la duración sumando el tiempo aproximado del nuevo punto
+    const updateDuracionQuery = `
+      UPDATE rutas
+      SET duracion = duracion + ROUND(
+        (
+          SELECT MIN(haversine(p.latitud, p.longitud, $2, $3))
+          FROM relacion_rutas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id = $1
+        ) / 5 * 60
+      )
+      WHERE id = $1
+      RETURNING duracion;
+    `;
+
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, lat_np, lon_np]);
 
     res.status(201).json({
-      mensaje: "Punto añadido a ruta correctamente",
-      ruta: ruta_id,
-      punto: punto_id
+      mensaje: "Punto añadido y duración actualizada aproximadamente",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
     });
 
   } catch (err) {
-    console.error("Error al añadir punto a ruta:", err);
+    console.error("Error al añadir punto y actualizar duración:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 //-------------------- PUT 
@@ -1130,6 +1160,56 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   
 });
 
+// PUT /rutas/:id/actualizar-duracion
+app.put("/rutas/:id/actualizar-duracion", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) return res.status(400).json({ error: "Falta el id de la ruta" });
+
+  try {
+    // Actualizar la duracion usando Haversine y velocidad promedio 5 km/h
+    const queryText = `
+      UPDATE rutas
+      SET duracion = ROUND(
+        (
+          WITH puntos_ruta AS (
+              SELECT p.id, p.latitud, p.longitud
+              FROM relacion_rutas_puntos rp
+              JOIN puntos_interes p ON p.id = rp.punto_id
+              WHERE rp.ruta_id = $1
+          )
+          SELECT SUM(min_dist)
+          FROM (
+              SELECT MIN(
+                  haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+              ) AS min_dist
+              FROM puntos_ruta p1
+              JOIN puntos_ruta p2 ON p1.id <> p2.id
+              GROUP BY p1.id
+          ) sub
+        ) / 5 * 60  -- velocidad promedio 5 km/h, minutos
+      )
+      WHERE id = $1
+      RETURNING id, duracion;
+    `;
+
+    const result = await query(queryText, [id]);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: `Ruta con id ${id} no encontrada` });
+    }
+
+    res.json({
+      mensaje: "Duración actualizada correctamente",
+      ruta: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar la duración de la ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+
 //-------------------- DELETE 
 
 // Eliminar ruta
@@ -1160,35 +1240,76 @@ app.delete("/rutas/:id", async (req, res) => {
   }
 });
 
-// Eliminar punto de todas las rutas
+// Eliminar punto de todas las rutas y actualizar duracion
 app.delete("/rutas/puntos/:id", async (req, res) => {
-  const id = req.params.id;
+  const punto_id = req.params.id;
+
   try {
-    const result = await query(
-      "DELETE FROM relacion_rutas_puntos WHERE punto_id = $1 RETURNING *",
-      [id]
+    // Obtener coordenadas del punto que se va a eliminar
+    const puntoResult = await query(
+      "SELECT latitud, longitud FROM puntos_interes WHERE id = $1",
+      [punto_id]
     );
-    if (result.length === 0) {
+
+    if (!puntoResult || puntoResult.length === 0) {
       return res.status(404).json({ error: "Punto no encontrado" });
     }
+
+    const { latitud: lat_np, longitud: lon_np } = puntoResult[0];
+
+    // Obtener todas las rutas donde está este punto
+    const rutasResult = await query(
+      "SELECT ruta_id FROM relacion_rutas_puntos WHERE punto_id = $1",
+      [punto_id]
+    );
+
+    if (!rutasResult || rutasResult.length === 0) {
+      return res.status(404).json({ error: "El punto no está asociado a ninguna ruta" });
+    }
+
+    // Eliminar el punto de todas las rutas
+    const deleted = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE punto_id = $1 RETURNING *",
+      [punto_id]
+    );
+
+    // Actualizar duración aproximada de cada ruta restando el tiempo del punto eliminado
+    for (const ruta of rutasResult) {
+      const updateDuracionQuery = `
+        UPDATE rutas
+        SET duracion = GREATEST(duracion - ROUND(
+          (
+            SELECT MIN(haversine(p.latitud, p.longitud, $2, $3))
+            FROM relacion_rutas_puntos rp
+            JOIN puntos_interes p ON p.id = rp.punto_id
+            WHERE rp.ruta_id = $1
+          ) / 5 * 60
+        ), 0)
+        WHERE id = $1
+        RETURNING duracion;
+      `;
+      await query(updateDuracionQuery, [ruta.ruta_id, lat_np, lon_np]);
+    }
+
     res.status(200).json({
-      mensaje: "Punto eliminado correctamente de todas las rutas",
-      punto_id: result[0].id,
+      mensaje: "Punto eliminado correctamente de todas las rutas y duración actualizada",
+      punto_id,
+      rutas_afectadas: rutasResult.map(r => r.ruta_id)
     });
+
   } catch (err) {
-    console.error("Error al eliminar punto:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-       detalles: err.message 
-    });
+    console.error("Error al eliminar punto y actualizar duración:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
-// Eliminar un punto de una ruta específica
+
+// Eliminar un punto de una ruta específica y actualizar duración
 app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
-  const { ruta_id, punto_id } = req.params; // recibimos ambos IDs
+  const { ruta_id, punto_id } = req.params;
 
   try {
+    // Primero eliminar la relación
     const result = await query(
       "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2 RETURNING *",
       [ruta_id, punto_id]
@@ -1198,19 +1319,47 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
       return res.status(404).json({ error: "No se encontró la relación ruta-punto" });
     }
 
+    // Recalcular la duración de la ruta después de eliminar el punto
+    const updateDuracionQuery = `
+      UPDATE rutas
+      SET duracion = ROUND(
+        (
+          WITH puntos_ruta AS (
+              SELECT p.id, p.latitud, p.longitud
+              FROM relacion_rutas_puntos rp
+              JOIN puntos_interes p ON p.id = rp.punto_id
+              WHERE rp.ruta_id = $1
+          )
+          SELECT SUM(min_dist)
+          FROM (
+              SELECT MIN(
+                  haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+              ) AS min_dist
+              FROM puntos_ruta p1
+              JOIN puntos_ruta p2 ON p1.id <> p2.id
+              GROUP BY p1.id
+          ) sub
+        ) / 5 * 60
+      )
+      WHERE id = $1
+      RETURNING duracion;
+    `;
+
+    const duracionResult = await query(updateDuracionQuery, [ruta_id]);
+
     res.status(200).json({
-      mensaje: "Punto eliminado correctamente de la ruta",
+      mensaje: "Punto eliminado y duración actualizada correctamente",
       ruta_id: result[0].ruta_id,
       punto_id: result[0].punto_id,
+      duracion: duracionResult[0].duracion
     });
+
   } catch (err) {
-    console.error("Error al eliminar punto de la ruta:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al eliminar punto de la ruta y actualizar duración:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 
