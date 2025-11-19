@@ -1203,25 +1203,28 @@ app.put("/rutas/:id/actualizar-duracion", async (req, res) => {
     // Actualizar la duracion usando Haversine y velocidad promedio 5 km/h
     const queryText = `
       UPDATE rutas
-      SET duracion = ROUND(
-        (
-          WITH puntos_ruta AS (
-              SELECT p.id, p.latitud, p.longitud
-              FROM relacion_rutas_puntos rp
-              JOIN puntos_interes p ON p.id = rp.punto_id
-              WHERE rp.ruta_id = $1
-          )
-          SELECT SUM(min_dist)
-          FROM (
-              SELECT MIN(
-                  haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
-              ) AS min_dist
-              FROM puntos_ruta p1
-              JOIN puntos_ruta p2 ON p1.id <> p2.id
-              GROUP BY p1.id
-          ) sub
-        ) / 5 * 60  -- velocidad promedio 5 km/h, minutos
-      )
+      SET duracion = CASE
+        WHEN (SELECT COUNT(*) FROM relacion_rutas_puntos WHERE ruta_id = $1) <= 1 THEN 0
+        ELSE ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        )
+      END
       WHERE id = $1
       RETURNING id, duracion;
     `;
@@ -1229,18 +1232,20 @@ app.put("/rutas/:id/actualizar-duracion", async (req, res) => {
     const result = await query(queryText, [id]);
 
     if (!result || result.length === 0) {
-      return res.status(404).json({ error: `Ruta con id ${id} no encontrada` });
+      return res.status(404).json({ error: "Ruta no encontrada" });
     }
 
-    res.json({
-      mensaje: "Duración actualizada correctamente",
-      ruta: result[0],
+    res.status(200).json({
+      mensaje: "Duración de la ruta actualizada",
+      ruta: result[0]
     });
+
   } catch (err) {
-    console.error("Error al actualizar la duración de la ruta:", err);
+    console.error("Error al actualizar duración de la ruta:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 //-------------------- DELETE 
