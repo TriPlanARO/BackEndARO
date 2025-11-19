@@ -1103,22 +1103,35 @@ app.post("/rutas/:ruta_id/puntos", async (req, res) => {
       [ruta_id, punto_id]
     );
 
-    // Actualizar la duración sumando el tiempo aproximado del nuevo punto
+    // Recalcular duración completa usando la misma lógica que PUT /rutas/:id/actualizar-duracion
     const updateDuracionQuery = `
       UPDATE rutas
-      SET duracion = COALESCE(duracion, 0) + COALESCE(ROUND(
-        (
-          SELECT MIN(haversine(p.latitud, p.longitud, $2, $3))
-          FROM relacion_rutas_puntos rp
-          JOIN puntos_interes p ON p.id = rp.punto_id
-          WHERE rp.ruta_id = $1 AND p.id <> $4
-        ) / 5 * 60
-      ), 0)
+      SET duracion = COALESCE(
+        ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        ), 0
+      )
       WHERE id = $1
       RETURNING duracion;
     `;
 
-    const duracionResult = await query(updateDuracionQuery, [ruta_id, lat_np, lon_np, punto_id]);
+    const duracionResult = await query(updateDuracionQuery, [ruta_id]);
 
     res.status(201).json({
       mensaje: "Punto añadido y duración actualizada aproximadamente",
