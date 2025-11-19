@@ -965,7 +965,7 @@ app.get("/rutas/:id", async (req, res) => {
 });
 //-------------------- POST 
 
-// Añadir una nueva ruta con puntos, evitando duplicados
+// Añadir una nueva ruta con puntos, evitando duplicados y calculando duración
 app.post("/rutas", async (req, res) => {
   const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs
 
@@ -1024,17 +1024,49 @@ app.post("/rutas", async (req, res) => {
 
       await query("COMMIT");
 
+      // Actualizar duración total de la ruta recién creada
+      const updateDuracionQuery = `
+        UPDATE rutas
+        SET duracion = ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        )
+        WHERE id = $1
+        RETURNING duracion;
+      `;
+      const duracionResult = await query(updateDuracionQuery, [nuevaRuta.id]);
+
       res.status(201).json({
-        mensaje: "Ruta y puntos añadidos correctamente",
-        ruta: nuevaRuta,
+        mensaje: "Ruta y puntos añadidos correctamente, duración calculada",
+        ruta: {
+          ...nuevaRuta,
+          duracion: duracionResult[0].duracion
+        },
         puntos_añadidos: añadidos,
         puntos_duplicados: duplicados
       });
+
     } else {
       res.status(201).json({
         mensaje: "Ruta añadida correctamente",
         ruta: nuevaRuta,
-        puntos_asociados: []
+        puntos_asociados: [],
+        duracion: 0
       });
     }
 
@@ -1044,6 +1076,7 @@ app.post("/rutas", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 //Insertar uun punto a una ruta especifica (se actualiza su duracion sumandole el tiempo del punto añadido)
 app.post("/rutas/:ruta_id/puntos", async (req, res) => {
