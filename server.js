@@ -1106,19 +1106,19 @@ app.post("/rutas/:ruta_id/puntos", async (req, res) => {
     // Actualizar la duración sumando el tiempo aproximado del nuevo punto
     const updateDuracionQuery = `
       UPDATE rutas
-      SET duracion = duracion + ROUND(
+      SET duracion = COALESCE(duracion, 0) + COALESCE(ROUND(
         (
           SELECT MIN(haversine(p.latitud, p.longitud, $2, $3))
           FROM relacion_rutas_puntos rp
           JOIN puntos_interes p ON p.id = rp.punto_id
-          WHERE rp.ruta_id = $1
+          WHERE rp.ruta_id = $1 AND p.id <> $4
         ) / 5 * 60
-      )
+      ), 0)
       WHERE id = $1
       RETURNING duracion;
     `;
 
-    const duracionResult = await query(updateDuracionQuery, [ruta_id, lat_np, lon_np]);
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, lat_np, lon_np, punto_id]);
 
     res.status(201).json({
       mensaje: "Punto añadido y duración actualizada aproximadamente",
@@ -1132,6 +1132,7 @@ app.post("/rutas/:ruta_id/puntos", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 
