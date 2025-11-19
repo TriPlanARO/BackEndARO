@@ -1360,7 +1360,7 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
     // Recalcular la duración de la ruta después de eliminar el punto
     const updateDuracionQuery = `
       UPDATE rutas
-      SET duracion = ROUND(
+      SET duracion = COALESCE(ROUND(
         (
           WITH puntos_ruta AS (
               SELECT p.id, p.latitud, p.longitud
@@ -1378,7 +1378,7 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
               GROUP BY p1.id
           ) sub
         ) / 5 * 60
-      )
+      ), 0)
       WHERE id = $1
       RETURNING duracion;
     `;
@@ -1397,6 +1397,7 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 
