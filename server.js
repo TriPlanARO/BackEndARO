@@ -1037,7 +1037,6 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
     });
   }
 
-
   const fechaObj = new Date(fecha);
   const fechaValida =
     fechaObj instanceof Date &&
@@ -1081,6 +1080,117 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
   }
 });
 
+
+app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
+  const id = req.params.id; 
+  const { nueva_contraseña, vieja_contraseña } = req.body; 
+
+  if (!nueva_contraseña || !vieja_contraseña) {
+    return res.status(400).json({ error: "Hay que añadir tanto la nueva como la vieja contraseña" });
+  }
+
+  try {
+    const result = await query("SELECT contrasena FROM usuarios WHERE id = $1", [id]);
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const match = await bcrypt.compare(vieja_contraseña, result[0].contrasena);
+
+    if (!match) {
+      return res.status(401).json({ error: "La contraseña actual es incorrecta" });
+    }
+    const saltRounds = 10; 
+    const hashedPassword = await bcrypt.hash(nueva_contraseña, saltRounds);
+
+    const resultUpdate = await query(
+      "UPDATE usuarios SET contrasena = $1 WHERE id = $2 RETURNING id, nombre_usuario, nombre, apellido, email, telefono",
+      [hashedPassword, id]
+    );
+
+    if (resultUpdate.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(200).json({
+      mensaje: "Contraseña actualizada correctamente",
+      usuario: resultUpdate[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar contraseña del usuario:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message 
+    });
+  }
+});
+
+
+//Obtener evento por rango de fechas
+app.get("/eventos/rango", async (req, res) => {
+  const { fecha_ini, fecha_fin } = req.body;
+  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!fecha_ini || !fecha_fin || !regexFecha.test(fecha_ini) || !regexFecha.test(fecha_fin)) {
+    return res.status(400).json({ error: "Hay que añadir tanto la fecha de inicio como la fecha de fin en formato valido (en formato YYYY-MM-DD)" });
+  }
+
+  const fechaObjIni = new Date(fecha_ini);
+  const fechaObjFin = new Date(fecha_fin);
+  
+  const fechaValidaIni =
+    fechaObj instanceof Date &&
+    !isNaN(fechaObjIni) &&
+    fechaObjIni.toISOString().startsWith(fecha_ini);
+
+  const fechaValidaFin =
+    fechaObj instanceof Date &&
+    !isNaN(fechaObjFin) &&
+    fechaObjFin.toISOString().startsWith(fecha_fin);
+
+  if (!fechaValidaIni || !fechaValidaFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio o fin proporcionada no existe."
+    });
+  }
+
+  if (fechaObjIni > fechaObjFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio no puede ser 'mayor' a la fecha fin"
+    });
+  }
+
+  try {
+    const eventos = await query(
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'tipo', p.tipo,
+                'latitud', p.latitud,
+                'longitud', p.longitud,
+                'descripcion', p.descripcion,
+                'imagen', p.imagen
+              ) END AS punto
+       FROM eventos e
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE 
+            e.fecha_ini::date <= $2::date
+        AND COALESCE(e.fecha_fin::date, e.fecha_ini::date) >= $1::date
+       ORDER BY e.id`,
+      [fecha_ini, fecha_fin]
+    );
+
+    res.json(eventos);
+  } catch (err) {
+    console.error("Error al consultar eventos por rango:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
 
 //-------------------- POST
 // Añadir nuevo evento con fecha_fin opcional
