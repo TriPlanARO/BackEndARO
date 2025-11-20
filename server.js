@@ -900,6 +900,71 @@ app.get("/eventos", async (req, res) => {
   }
 });
 
+//Obtener evento por rango de fechas
+app.get("/eventos/rango", async (req, res) => {
+  const { fecha_ini, fecha_fin } = req.query;
+  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!fecha_ini || !fecha_fin || !regexFecha.test(fecha_ini) || !regexFecha.test(fecha_fin)) {
+    return res.status(400).json({ error: "Hay que añadir tanto la fecha de inicio como la fecha de fin en formato valido (en formato YYYY-MM-DD)" });
+  }
+
+  const fechaObjIni = new Date(fecha_ini);
+  const fechaObjFin = new Date(fecha_fin);
+  
+  const fechaValidaIni =
+    fechaObjIni instanceof Date &&
+    !isNaN(fechaObjIni) &&
+    fechaObjIni.toISOString().startsWith(fecha_ini);
+
+  const fechaValidaFin =
+    fechaObjFin instanceof Date &&
+    !isNaN(fechaObjFin) &&
+    fechaObjFin.toISOString().startsWith(fecha_fin);
+
+  if (!fechaValidaIni || !fechaValidaFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio o fin proporcionada no existe."
+    });
+  }
+
+  if (fechaObjIni > fechaObjFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio no puede ser 'mayor' a la fecha fin"
+    });
+  }
+
+  try {
+    const eventos = await query(
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'tipo', p.tipo,
+                'latitud', p.latitud,
+                'longitud', p.longitud,
+                'descripcion', p.descripcion,
+                'imagen', p.imagen
+              ) END AS punto
+       FROM eventos e
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE 
+            e.fecha_ini::date <= $2::date
+        AND COALESCE(e.fecha_fin::date, e.fecha_ini::date) >= $1::date
+       ORDER BY e.id`,
+      [fecha_ini, fecha_fin]
+    );
+
+    res.json(eventos);
+  } catch (err) {
+    console.error("Error al consultar eventos por rango:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
 // Obtener evento por ID
 app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
@@ -1073,71 +1138,6 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
     res.json(eventos);
   } catch (err) {
     console.error("Error al consultar los eventos por fecha:", err);
-    res.status(500).json({
-      error: "Error en la base de datos",
-      detalles: err.message
-    });
-  }
-});
-
-//Obtener evento por rango de fechas
-app.get("/eventos/rango", async (req, res) => {
-  const { fecha_ini, fecha_fin } = req.query;
-  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
-
-  if (!fecha_ini || !fecha_fin || !regexFecha.test(fecha_ini) || !regexFecha.test(fecha_fin)) {
-    return res.status(400).json({ error: "Hay que añadir tanto la fecha de inicio como la fecha de fin en formato valido (en formato YYYY-MM-DD)" });
-  }
-
-  const fechaObjIni = new Date(fecha_ini);
-  const fechaObjFin = new Date(fecha_fin);
-  
-  const fechaValidaIni =
-    fechaObjIni instanceof Date &&
-    !isNaN(fechaObjIni) &&
-    fechaObjIni.toISOString().startsWith(fecha_ini);
-
-  const fechaValidaFin =
-    fechaObjFin instanceof Date &&
-    !isNaN(fechaObjFin) &&
-    fechaObjFin.toISOString().startsWith(fecha_fin);
-
-  if (!fechaValidaIni || !fechaValidaFin) {
-    return res.status(400).json({
-      error: "La fecha de inicio o fin proporcionada no existe."
-    });
-  }
-
-  if (fechaObjIni > fechaObjFin) {
-    return res.status(400).json({
-      error: "La fecha de inicio no puede ser 'mayor' a la fecha fin"
-    });
-  }
-
-  try {
-    const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
-              CASE WHEN e.punto_id IS NOT NULL THEN json_build_object(
-                'id', p.id,
-                'nombre', p.nombre,
-                'tipo', p.tipo,
-                'latitud', p.latitud,
-                'longitud', p.longitud,
-                'descripcion', p.descripcion,
-                'imagen', p.imagen
-              ) END AS punto
-       FROM eventos e
-       LEFT JOIN puntos_interes p ON e.punto_id = p.id
-       WHERE 
-            e.fecha_ini::date <= $2::date
-        AND COALESCE(e.fecha_fin::date, e.fecha_ini::date) >= $1::date
-       ORDER BY e.id`,
-      [fecha_ini, fecha_fin]
-    );
-
-    res.json(eventos);
-  } catch (err) {
-    console.error("Error al consultar eventos por rango:", err);
     res.status(500).json({
       error: "Error en la base de datos",
       detalles: err.message
