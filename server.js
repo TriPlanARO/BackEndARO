@@ -1082,7 +1082,7 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
 
 //Obtener evento por rango de fechas
 app.get("/eventos/rango", async (req, res) => {
-  const { fecha_ini, fecha_fin } = req.body;
+  const { fecha_ini, fecha_fin } = req.query;
   const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
 
   if (!fecha_ini || !fecha_fin || !regexFecha.test(fecha_ini) || !regexFecha.test(fecha_fin)) {
@@ -1093,12 +1093,12 @@ app.get("/eventos/rango", async (req, res) => {
   const fechaObjFin = new Date(fecha_fin);
   
   const fechaValidaIni =
-    fechaObj instanceof Date &&
+    fechaObjIni instanceof Date &&
     !isNaN(fechaObjIni) &&
     fechaObjIni.toISOString().startsWith(fecha_ini);
 
   const fechaValidaFin =
-    fechaObj instanceof Date &&
+    fechaObjFin instanceof Date &&
     !isNaN(fechaObjFin) &&
     fechaObjFin.toISOString().startsWith(fecha_fin);
 
