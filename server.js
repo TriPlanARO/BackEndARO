@@ -1,6 +1,15 @@
 import express from "express";
 import { query } from "./conectarBD.js"; // conexión a Supabase/PostgreSQL
 import bcrypt from "bcrypt";
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = 'token';
+const payload = {   //esto se debe rellenar tambien en el postman 
+  id: usuario.id,           // identificador del usuario
+  email: usuario.email,     // email del usuario
+  //rol: usuario.rol || "user"   // su rol o tipo
+};
+
 
 const app = express();
 app.use(express.json()); // para procesar JSON
@@ -90,26 +99,6 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
   }
 });
 
-// Obtener eventos favoritos de un usuario
-app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
-  const usuario_id = req.params;
-
-  try {
-    const eventosFavoritos = await query(
-      `SELECT ef.idEvento, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.idEvento = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.idUsuario = $1 ORDER BY e.id;`,
-      [usuario_id]
-    );
-
-    res.json(eventosFavoritos);
-  } catch (err) {
-    console.error("Error al consultar eventos favoritos del usuario:", err);
-    res.status(500).json({
-      error: "Error en la base de datos",
-      detalles: err.message,
-    });
-  }
-});
-
 //-------------------- POST 
 //Añadir punto 
 app.post("/puntos", async (req, res) => {
@@ -168,45 +157,6 @@ app.post("/puntos/tipo", async (req, res) => {
     res.status(500).json({
       error: "Error en la base de datos",
       detalles: err.message
-    });
-  }
-});
-
-// Añadir un punto favorito para un usuario 
-app.post("/usuarios/:usuario_id/puntos-favoritos", async (req, res) => {
-  const { usuario_id } = req.params;
-  const { punto_id } = req.body;
-
-  if (!punto_id) {
-    return res.status(400).json({ error: "Falta el id del punto" });
-  }
-
-  try {
-    // Verificar si el punto ya es favorito del usuario
-    const existeFavorito = await query(
-      "SELECT * FROM puntos_favoritos WHERE usuario_id = $1 AND punto_id = $2",
-      [usuario_id, punto_id]
-    );
-
-    if (existeFavorito.length > 0) {
-      return res.status(409).json({ error: "El punto ya está en favoritos" });
-    }
-
-    // Insertar el punto como favorito
-    const result = await query(
-      "INSERT INTO puntos_favoritos (usuario_id, punto_id) VALUES ($1, $2) RETURNING *",
-      [usuario_id, punto_id]
-    );
-
-    res.status(201).json({
-      mensaje: "Punto añadido a favoritos correctamente",
-      favorito: result[0],
-    });
-  } catch (err) {
-    console.error("Error al añadir punto a favoritos:", err);
-    res.status(500).json({
-      error: "Error en la base de datos",
-      detalles: err.message,
     });
   }
 });
@@ -452,6 +402,25 @@ app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) 
   }
 });
 
+// Obtener eventos favoritos de un usuario
+app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
+  const usuario_id = req.params;
+
+  try {
+    const eventosFavoritos = await query(
+      `SELECT ef.idEvento, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.idEvento = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.idUsuario = $1 ORDER BY e.id;`,
+      [usuario_id]
+    );
+
+    res.json(eventosFavoritos);
+  } catch (err) {
+    console.error("Error al consultar eventos favoritos del usuario:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message,
+    });
+  }
+});
 
 //-------------------- POST
 // Añadir usuario 
@@ -512,7 +481,13 @@ app.post("/login", async (req, res) => {
     const match = await bcrypt.compare(password, usuario.contrasena);
     if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    res.json({ nombre: usuario.nombre, id: usuario.id });
+    //Generacion de token
+    const token = jwt.sign(
+      payload,
+      JWT_SECRET,
+      { expiresIn: '2h' } // El token expira en 2 horas
+    );
+    res.json({token,mensaje:"login correcto y token creado", nombre: usuario.nombre, id: usuario.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
@@ -666,6 +641,45 @@ app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos", async (re
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
+// Añadir un evento a favoritos de un usuario
+app.post("/usuarios/eventos-favoritos", async (req, res) => {
+  const { usuario_id, evento_id } = req.body;
+
+  if (!usuario_id || !evento_id) {
+    return res.status(400).json({ error: "Faltan datos: usuario_id o evento_id" });
+  }
+
+  try {
+    // Verificar si ya existe la relación
+    const existe = await query(
+      "SELECT * FROM eventos_favoritos WHERE idUsuario = $1 AND idEvento = $2",
+      [usuario_id, evento_id]
+    );
+
+    if (existe.length > 0) {
+      return res.status(409).json({ mensaje: "Evento ya está en favoritos" });
+    }
+
+    // Insertar el evento en favoritos
+    const result = await query(
+      "INSERT INTO eventos_favoritos (idUsuario, idEvento) VALUES ($1, $2) RETURNING *",
+      [usuario_id, evento_id]
+    );
+
+    res.status(201).json({
+      mensaje: "Evento añadido a favoritos correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al añadir evento favorito:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
 
 //-------------------- PUT
 
@@ -838,6 +852,36 @@ app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion
   }
 });
 
+app.put("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res) => {
+  const { usuario_id, evento_id } = req.params;
+  const { nuevo_evento_id } = req.body;
+
+  if (!nuevo_evento_id) {
+    return res.status(400).json({ error: "Falta el nuevo id del evento" });
+  }
+
+  try {
+    const result = await query(
+      "UPDATE eventos_favoritos SET idEvento = $3 WHERE idUsuario = $1 AND idEvento = $2 RETURNING *",
+      [usuario_id, evento_id, nuevo_evento_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "No se encontró el evento favorito para actualizar" });
+    }
+
+    res.status(200).json({
+      mensaje: "Evento favorito actualizado correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al actualizar evento favorito:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
 
 //-------------------- DELETE
 //Borrar usuario
@@ -925,6 +969,32 @@ app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id
   }
 });
 
+// Eliminar un evento favorito de un usuario
+app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res) => {
+  const { usuario_id, evento_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM eventos_favoritos WHERE idUsuario = $1 AND idEvento = $2 RETURNING *",
+      [usuario_id, evento_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "No se encontró el evento favorito para eliminar" });
+    }
+
+    res.status(200).json({
+      mensaje: "Evento favorito eliminado correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al eliminar evento favorito:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
 
 //-------------------- EVENTOS --------------------
 //-------------------- GET 
@@ -1877,6 +1947,7 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
   }
 });
 
+// -------------------- FUNCION AUTENTICAR TOKEN --------------------
 
 
 
