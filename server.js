@@ -5,7 +5,7 @@ import bcrypt from "bcrypt";
 const app = express();
 app.use(express.json()); // para procesar JSON
 
-const API_KEY = process.env.API_KEY; // valor por defecto para probar || "TEST_API_KEY_12345"
+const API_KEY = process.env.API_KEY; // valor por defecto para probar 
 
 //------MIDDLEWARE
 function apiKeyAuth(req, res, next) {
