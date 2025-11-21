@@ -399,7 +399,7 @@ app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
 
   try {
     const eventosFavoritos = await query(
-      `SELECT ef.idEvento, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.idEvento = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.idUsuario = $1 ORDER BY e.id;`,
+      `SELECT ef.evento_id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.evento_id = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.usuario_id = $1 ORDER BY e.id;`,
       [usuario_id]
     );
 
@@ -638,7 +638,7 @@ app.post("/usuarios/eventos-favoritos", async (req, res) => {
   try {
     // Verificar si ya existe la relación
     const existe = await query(
-      "SELECT * FROM eventos_favoritos WHERE idUsuario = $1 AND idEvento = $2",
+      "SELECT * FROM eventos_favoritos WHERE usuario_id = $1 AND evento_id = $2",
       [usuario_id, evento_id]
     );
 
@@ -648,7 +648,7 @@ app.post("/usuarios/eventos-favoritos", async (req, res) => {
 
     // Insertar el evento en favoritos
     const result = await query(
-      "INSERT INTO eventos_favoritos (idUsuario, idEvento) VALUES ($1, $2) RETURNING *",
+      "INSERT INTO eventos_favoritos (usuario_id, evento_id) VALUES ($1, $2) RETURNING *",
       [usuario_id, evento_id]
     );
 
@@ -664,6 +664,7 @@ app.post("/usuarios/eventos-favoritos", async (req, res) => {
     });
   }
 });
+
 
 
 //-------------------- PUT
@@ -837,37 +838,6 @@ app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion
   }
 });
 
-app.put("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res) => {
-  const { usuario_id, evento_id } = req.params;
-  const { nuevo_evento_id } = req.body;
-
-  if (!nuevo_evento_id) {
-    return res.status(400).json({ error: "Falta el nuevo id del evento" });
-  }
-
-  try {
-    const result = await query(
-      "UPDATE eventos_favoritos SET idEvento = $3 WHERE idUsuario = $1 AND idEvento = $2 RETURNING *",
-      [usuario_id, evento_id, nuevo_evento_id]
-    );
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "No se encontró el evento favorito para actualizar" });
-    }
-
-    res.status(200).json({
-      mensaje: "Evento favorito actualizado correctamente",
-      favorito: result[0],
-    });
-  } catch (err) {
-    console.error("Error al actualizar evento favorito:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message
-    });
-  }
-});
-
 //-------------------- DELETE
 //Borrar usuario
 app.delete("/usuarios/:id", async (req, res) => {
@@ -960,7 +930,7 @@ app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res
 
   try {
     const result = await query(
-      "DELETE FROM eventos_favoritos WHERE idUsuario = $1 AND idEvento = $2 RETURNING *",
+      "DELETE FROM eventos_favoritos WHERE usuario_id = $1 AND evento_id = $2 RETURNING *",
       [usuario_id, evento_id]
     );
 
