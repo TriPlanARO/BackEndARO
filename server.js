@@ -4,6 +4,22 @@ import bcrypt from "bcrypt";
 
 const app = express();
 app.use(express.json()); // para procesar JSON
+
+const API_KEY = process.env.API_KEY; // valor por defecto para probar || "TEST_API_KEY_12345"
+
+//------MIDDLEWARE
+function apiKeyAuth(req, res, next) {
+  // busca en header 'x-api-key' o en query 'api_key'
+  const key = req.get("x-api-key") || req.query.api_key;
+  if (!key) {
+    return res.status(401).json({ error: "Falta API key (usa header 'x-api-key' o query 'api_key')" });
+  }
+  if (key !== API_KEY) {
+    return res.status(403).json({ error: "API key inválida" });
+  }
+  next();
+}
+
 const port = process.env.PORT || 10000;
 
 //-------------------- PUNTOS --------------------
@@ -92,7 +108,7 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
 
 //-------------------- POST 
 //Añadir punto 
-app.post("/puntos", async (req, res) => {
+app.post("/puntos",apiKeyAuth, async (req, res) => {
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body;
 
   // Validar campos obligatorios
@@ -1920,6 +1936,7 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
+
 
 
 // -------------------- INICIAR SERVIDOR --------------------
