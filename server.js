@@ -395,15 +395,33 @@ app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) 
 
 // Obtener eventos favoritos de un usuario
 app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
-  const usuario_id = req.params;
+  const { usuario_id } = req.params;
 
   try {
     const eventosFavoritos = await query(
-      `SELECT ef.evento_id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.evento_id = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.usuario_id = $1 ORDER BY e.id;`,
+      `SELECT ef.usuario_id, ef.evento_id, 
+              e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE 
+                WHEN e.punto_id IS NOT NULL THEN 
+                  json_build_object(
+                    'id', p.id, 
+                    'nombre', p.nombre, 
+                    'tipo', p.tipo, 
+                    'latitud', p.latitud, 
+                    'longitud', p.longitud, 
+                    'descripcion', p.descripcion, 
+                    'imagen', p.imagen
+                  )
+              END AS punto
+       FROM eventos_favoritos ef
+       JOIN eventos e ON ef.evento_id = e.id
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE ef.usuario_id = $1
+       ORDER BY e.id;`,
       [usuario_id]
     );
 
-    res.json(eventosFavoritos);
+    res.status(200).json(eventosFavoritos);
   } catch (err) {
     console.error("Error al consultar eventos favoritos del usuario:", err);
     res.status(500).json({
@@ -412,6 +430,7 @@ app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
     });
   }
 });
+
 
 //-------------------- POST
 // Añadir usuario 
