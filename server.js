@@ -1,16 +1,6 @@
 import express from "express";
 import { query } from "./conectarBD.js"; // conexión a Supabase/PostgreSQL
 import bcrypt from "bcrypt";
-import jwt from 'jsonwebtoken';
-
-
-const JWT_SECRET = 'token';
-const payload = {   //esto se debe rellenar tambien en el postman 
-  id: usuario.id,           // identificador del usuario
-  email: usuario.email,     // email del usuario
-  //rol: usuario.rol || "user"   // su rol o tipo
-};
-
 
 const app = express();
 app.use(express.json()); // para procesar JSON
@@ -482,13 +472,7 @@ app.post("/login", async (req, res) => {
     const match = await bcrypt.compare(password, usuario.contrasena);
     if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    //Generacion de token
-    const token = jwt.sign(
-      payload,
-      JWT_SECRET,
-      { expiresIn: '2h' } // El token expira en 2 horas
-    );
-    res.json({token,mensaje:"login correcto y token creado", nombre: usuario.nombre, id: usuario.id });
+    res.json({mensaje:"login correcto y token creado", nombre: usuario.nombre, id: usuario.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
@@ -1947,10 +1931,6 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
-
-// -------------------- FUNCION AUTENTICAR TOKEN --------------------
-
-
 
 
 // -------------------- INICIAR SERVIDOR --------------------
