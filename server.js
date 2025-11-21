@@ -90,6 +90,26 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
   }
 });
 
+// Obtener eventos favoritos de un usuario
+app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
+  const usuario_id = req.params;
+
+  try {
+    const eventosFavoritos = await query(
+      `SELECT ef.idEvento, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, CASE WHEN e.punto_id IS NOT NULL THEN json_build_object('id', p.id, 'nombre', p.nombre, 'tipo', p.tipo, 'latitud', p.latitud, 'longitud', p.longitud, 'descripcion', p.descripcion, 'imagen', p.imagen) END AS punto FROM eventos_favoritos ef JOIN eventos e ON ef.idEvento = e.id LEFT JOIN puntos_interes p ON e.punto_id = p.id WHERE ef.idUsuario = $1 ORDER BY e.id;`,
+      [usuario_id]
+    );
+
+    res.json(eventosFavoritos);
+  } catch (err) {
+    console.error("Error al consultar eventos favoritos del usuario:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message,
+    });
+  }
+});
+
 //-------------------- POST 
 //Añadir punto 
 app.post("/puntos", async (req, res) => {
@@ -148,6 +168,45 @@ app.post("/puntos/tipo", async (req, res) => {
     res.status(500).json({
       error: "Error en la base de datos",
       detalles: err.message
+    });
+  }
+});
+
+// Añadir un punto favorito para un usuario 
+app.post("/usuarios/:usuario_id/puntos-favoritos", async (req, res) => {
+  const { usuario_id } = req.params;
+  const { punto_id } = req.body;
+
+  if (!punto_id) {
+    return res.status(400).json({ error: "Falta el id del punto" });
+  }
+
+  try {
+    // Verificar si el punto ya es favorito del usuario
+    const existeFavorito = await query(
+      "SELECT * FROM puntos_favoritos WHERE usuario_id = $1 AND punto_id = $2",
+      [usuario_id, punto_id]
+    );
+
+    if (existeFavorito.length > 0) {
+      return res.status(409).json({ error: "El punto ya está en favoritos" });
+    }
+
+    // Insertar el punto como favorito
+    const result = await query(
+      "INSERT INTO puntos_favoritos (usuario_id, punto_id) VALUES ($1, $2) RETURNING *",
+      [usuario_id, punto_id]
+    );
+
+    res.status(201).json({
+      mensaje: "Punto añadido a favoritos correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al añadir punto a favoritos:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message,
     });
   }
 });
