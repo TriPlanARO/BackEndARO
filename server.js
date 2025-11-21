@@ -3,6 +3,7 @@ import { query } from "./conectarBD.js"; // conexión a Supabase/PostgreSQL
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 
+
 const JWT_SECRET = 'token';
 const payload = {   //esto se debe rellenar tambien en el postman 
   id: usuario.id,           // identificador del usuario
