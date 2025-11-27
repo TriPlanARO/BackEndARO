@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json()); // para procesar JSON
 
 const API_KEY = process.env.API_KEY; // valor por defecto para probar 
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY; // clave API para administradores
 
 //------MIDDLEWARE
 function apiKeyAuth(req, res, next) {
@@ -20,13 +21,25 @@ function apiKeyAuth(req, res, next) {
   next();
 }
 
+function adminApiKeyAuth(req, res, next) {
+  // busca en header 'x-admin-api-key' o en query 'admin_api_key'
+  const key = req.get("x-admin-api-key") || req.query.admin_api_key;
+  if (!key) {
+    return res.status(401).json({ error: "Falta Admin API key (usa header 'x-admin-api-key' o query 'admin_api_key')" });
+  }
+  if (key !== ADMIN_API_KEY) {
+    return res.status(403).json({ error: "Admin API key inválida" });
+  }
+  next();
+}
+
 const port = process.env.PORT || 10000;
 
 //-------------------- PUNTOS --------------------
 
 //-------------------- GET 
 // Obtener todos los puntos de interés
-app.get("/puntos", async (req, res) => {
+app.get("/puntos",apiKeyAuth, async (req, res) => {
   try {
     const puntos = await query(
       "SELECT ID, NOMBRE, TIPO, LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes"
@@ -42,7 +55,7 @@ app.get("/puntos", async (req, res) => {
 });
 
 // Obtener punto por ID
-app.get("/puntos/:id", async (req, res) => {
+app.get("/puntos/:id",apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -66,7 +79,7 @@ app.get("/puntos/:id", async (req, res) => {
 });
 
 // Obtener puntos por tipo
-app.get("/puntos/tipo/:tipos", async (req, res) => {
+app.get("/puntos/tipo/:tipos",apiKeyAuth, async (req, res) => {
   const tipos = req.params.tipos.split(',');  
   
   if (tipos.length === 0) {
@@ -92,7 +105,7 @@ app.get("/puntos/tipo/:tipos", async (req, res) => {
 });
 
 // Obtener puntos por nombre 
-app.get("/puntos/nombre/:nombre", async (req, res) => {
+app.get("/puntos/nombre/:nombre",apiKeyAuth, async (req, res) => {
   const nombre = req.params.nombre;
   try {
     const puntos = await query(
@@ -108,7 +121,7 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
 
 //-------------------- POST 
 //Añadir punto 
-app.post("/puntos",apiKeyAuth, async (req, res) => {
+app.post("/puntos",adminApiKeyAuth, async (req, res) => {
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body;
 
   // Validar campos obligatorios
@@ -139,7 +152,7 @@ app.post("/puntos",apiKeyAuth, async (req, res) => {
 });
 
 // Añadir un nuevo tipo de punto (tipo_enum)
-app.post("/puntos/tipo", async (req, res) => {
+app.post("/puntos/tipo",adminApiKeyAuth, async (req, res) => {
   const { nuevoTipo } = req.body;
 
   // Validar campo obligatorio
@@ -170,7 +183,7 @@ app.post("/puntos/tipo", async (req, res) => {
 
 //-------------------- PUT
 //Actualizar puntos de interés
-app.put("/puntos/:id/actualizar", async (req, res) => {
+app.put("/puntos/:id/actualizar",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body; 
   const fieldsToUpdate = [];
@@ -238,7 +251,7 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
 
 //-------------------- DELETE
 //Borrar punto de interés, borrando referencias de eventos y rutas
-app.delete("/puntos/:id", async (req, res) => {
+app.delete("/puntos/:id",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
 
   try {
@@ -274,7 +287,7 @@ app.delete("/puntos/:id", async (req, res) => {
 
 //-------------------- GET 
 // Obtener todos los usuarios
-app.get("/usuarios", async (req, res) => {
+app.get("/usuarios",apiKeyAuth, async (req, res) => {
   try {
     const usuarios = await query(
       "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios"
@@ -290,7 +303,7 @@ app.get("/usuarios", async (req, res) => {
 });
 
 // Obtener usuario por ID
-app.get("/usuarios/:id", async (req, res) => {
+app.get("/usuarios/:id",apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const usuario = await query(
@@ -314,7 +327,7 @@ app.get("/usuarios/:id", async (req, res) => {
 });
 
 // Obtener usuario por email
-app.get("/usuarios/email/:email", async (req, res) => {
+app.get("/usuarios/email/:email",apiKeyAuth, async (req, res) => {
   const email = req.params.email;
   try {
     const usuario = await query(
@@ -338,7 +351,7 @@ app.get("/usuarios/email/:email", async (req, res) => {
 });
 
 // Obtener todas las rutas personalizadas de un usuario
-app.get("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
+app.get("/usuarios/:usuario_id/rutas-personalizadas",apiKeyAuth, async (req, res) => {
   const { usuario_id } = req.params;
   try {
     const rutas = await query(
@@ -372,7 +385,7 @@ app.get("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
 });
 
 // Obtener una ruta personalizada por ID y usuario
-app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => {
   const { usuario_id, ruta_id } = req.params;
   try {
     const result = await query(
@@ -410,7 +423,7 @@ app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) 
 });
 
 // Obtener eventos favoritos de un usuario
-app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
+app.get("/usuarios/eventos-favoritos/:usuario_id",apiKeyAuth, async (req, res) => {
   const { usuario_id } = req.params;
 
   try {
@@ -450,7 +463,7 @@ app.get("/usuarios/eventos-favoritos/:usuario_id", async (req, res) => {
 
 //-------------------- POST
 // Añadir usuario 
-app.post("/usuarios", async (req, res) => {
+app.post("/usuarios",adminApiKeyAuth, async (req, res) => { //REVISAR
   const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
 
   // Verificar campos obligatorios
@@ -496,7 +509,7 @@ app.post("/usuarios", async (req, res) => {
 });
 
 //Comprobar credenciales login
-app.post("/login", async (req, res) => {
+app.post("/login",apiKeyAuth, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -515,7 +528,7 @@ app.post("/login", async (req, res) => {
 });
 
 // Crear nueva ruta personalizada con puntos y calcular duración
-app.post("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
+app.post("/usuarios/:usuario_id/rutas-personalizadas",apiKeyAuth, async (req, res) => {
   const { usuario_id } = req.params;
   const { nombre, descripcion, puntos } = req.body; // puntos es array de IDs
 
@@ -604,7 +617,7 @@ app.post("/usuarios/:usuario_id/rutas-personalizadas", async (req, res) => {
 });
 
 // Añadir un punto a una ruta personalizada existente
-app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos", async (req, res) => {
+app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos",apiKeyAuth, async (req, res) => {
   const { usuario_id, ruta_id } = req.params;
   const { punto_id } = req.body;
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
@@ -663,7 +676,7 @@ app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos", async (re
 });
 
 // Añadir un evento a favoritos de un usuario
-app.post("/usuarios/eventos-favoritos", async (req, res) => {
+app.post("/usuarios/eventos-favoritos",apiKeyAuth, async (req, res) => {
   const { usuario_id, evento_id } = req.body;
 
   if (!usuario_id || !evento_id) {
@@ -705,7 +718,7 @@ app.post("/usuarios/eventos-favoritos", async (req, res) => {
 //-------------------- PUT
 
 //Actualizar la contraseña de un usuario
-app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
+app.put("/usuarios/:id/cambiar-contrasena",apiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nueva_contraseña, vieja_contraseña } = req.body; 
 
@@ -751,7 +764,7 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
 });
 
 //Actualizar cualquier campo de usuarios
-app.put("/usuarios/:id/actualizar", async (req, res) => {
+app.put("/usuarios/:id/actualizar",apiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre_usuario, nombre, apellido, email, telefono } = req.body; 
 
@@ -813,7 +826,7 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
 });
 
 // Actualizar ruta personalizada (nombre, descripcion)
-app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => {
   const { usuario_id, ruta_id } = req.params;
   const { nombre, descripcion } = req.body;
 
@@ -839,7 +852,7 @@ app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) 
 });
 
 // Actualizar duración de ruta personalizada
-app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion", async (req, res) => {
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion",apiKeyAuth, async (req, res) => {
   const { usuario_id, ruta_id } = req.params;
 
   try {
@@ -875,7 +888,7 @@ app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion
 
 //-------------------- DELETE
 //Borrar usuario
-app.delete("/usuarios/:id", async (req, res) => {
+app.delete("/usuarios/:id",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -900,7 +913,7 @@ app.delete("/usuarios/:id", async (req, res) => {
 });
 
 // Eliminar ruta personalizada
-app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, res) => {
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",adminApiKeyAuth, async (req, res) => { //REVISAR
   const { usuario_id, ruta_id } = req.params;
   try {
     await query("DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2", [ruta_id, usuario_id]);
@@ -914,7 +927,7 @@ app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id", async (req, re
 });
 
 // Eliminar un punto de una ruta personalizada
-app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id", async (req, res) => {
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id",adminApiKeyAuth, async (req, res) => { //REVISAR
   const { usuario_id, ruta_id, punto_id } = req.params;
 
   try {
@@ -960,7 +973,7 @@ app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id
 });
 
 // Eliminar un evento favorito de un usuario
-app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res) => {
+app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", apiKeyAuth, async (req, res) => { //REVISAR
   const { usuario_id, evento_id } = req.params;
 
   try {
@@ -990,7 +1003,7 @@ app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", async (req, res
 //-------------------- GET 
 
 // Obtener todos los eventos
-app.get("/eventos", async (req, res) => {
+app.get("/eventos", apiKeyAuth, async (req, res) => {
   try {
     const eventos = await query(`
       SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
@@ -1020,7 +1033,7 @@ app.get("/eventos", async (req, res) => {
 });
 
 //Obtener evento por rango de fechas
-app.get("/eventos/rango", async (req, res) => {
+app.get("/eventos/rango", apiKeyAuth, async (req, res) => {
   const { fecha_ini, fecha_fin } = req.query;
   const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1085,7 +1098,7 @@ app.get("/eventos/rango", async (req, res) => {
 });
 
 // Obtener evento por ID
-app.get("/eventos/:id", async (req, res) => {
+app.get("/eventos/:id", apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
@@ -1127,7 +1140,7 @@ app.get("/eventos/:id", async (req, res) => {
 
 
 // Obtener eventos por tipo
-app.get("/eventos/tipo/:tipos", async (req, res) => {
+app.get("/eventos/tipo/:tipos", apiKeyAuth, async (req, res) => {
 
   const tipos = req.params.tipos.split(',');
 
@@ -1170,7 +1183,7 @@ app.get("/eventos/tipo/:tipos", async (req, res) => {
 });
 
 // Obtener eventos por nombre
-app.get("/eventos/nombre/:nombre", async (req, res) => {
+app.get("/eventos/nombre/:nombre", apiKeyAuth, async (req, res) => {
   const nombre = req.params.nombre;
 
   if (!nombre) {
@@ -1211,7 +1224,7 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
 });
 
 // Obtener eventos por fecha
-app.get("/eventos/fecha/:fecha", async (req, res) => {
+app.get("/eventos/fecha/:fecha", apiKeyAuth, async (req, res) => {
   const fecha = req.params.fecha;
   const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1266,7 +1279,7 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
 
 //-------------------- POST
 // Añadir nuevo evento con fecha_fin opcional
-app.post("/eventos", async (req, res) => {
+app.post("/eventos", adminApiKeyAuth, async (req, res) => {
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, enlace, punto_id } = req.body;
 
   // Validar campos obligatorios
@@ -1309,7 +1322,7 @@ app.post("/eventos", async (req, res) => {
 
 //-------------------- PUT 
 //Actualizar eventos
-app.put("/eventos/:id/actualizar", async (req, res) => {
+app.put("/eventos/:id/actualizar", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace } = req.body; 
   const fieldsToUpdate = [];
@@ -1389,7 +1402,7 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
 
 //-------------------- DELETE 
 //Borrar evento
-app.delete("/eventos/:id", async (req, res) => {
+app.delete("/eventos/:id", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -1418,7 +1431,7 @@ app.delete("/eventos/:id", async (req, res) => {
 //-------------------- GET 
 
 // Obtener todos las rutas
-app.get("/rutas", async (req, res) => {
+app.get("/rutas", apiKeyAuth, async (req, res) => {
   try {
     const rutas = await query(
       `SELECT r.*, 
@@ -1450,7 +1463,7 @@ app.get("/rutas", async (req, res) => {
 });
 
 // Obtener una ruta por ID
-app.get("/rutas/:id", async (req, res) => {
+app.get("/rutas/:id", apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -1491,7 +1504,7 @@ app.get("/rutas/:id", async (req, res) => {
 //-------------------- POST 
 
 // Añadir una nueva ruta con puntos, evitando duplicados y calculando duración
-app.post("/rutas", async (req, res) => {
+app.post("/rutas", adminApiKeyAuth, async (req, res) => {
   const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs
 
   if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
@@ -1604,7 +1617,7 @@ app.post("/rutas", async (req, res) => {
 
 
 //Insertar uun punto a una ruta especifica (se actualiza su duracion sumandole el tiempo del punto añadido)
-app.post("/rutas/:ruta_id/puntos", async (req, res) => {
+app.post("/rutas/:ruta_id/puntos", adminApiKeyAuth, async (req, res) => {
   const { ruta_id } = req.params;
   const { punto_id } = req.body; 
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
@@ -1676,7 +1689,7 @@ app.post("/rutas/:ruta_id/puntos", async (req, res) => {
 
 //-------------------- PUT 
 //Actualizar rutas
-app.put("/rutas/:id/actualizar", async (req, res) => {
+app.put("/rutas/:id/actualizar", adminApiKeyAuth, async (req, res) => {
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
 
@@ -1733,7 +1746,7 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
 });
 
 // PUT /rutas/:id/actualizar-duracion
-app.put("/rutas/:id/actualizar-duracion", async (req, res) => {
+app.put("/rutas/:id/actualizar-duracion", adminApiKeyAuth, async (req, res) => {
   const { id } = req.params;
 
   if (!id) return res.status(400).json({ error: "Falta el id de la ruta" });
@@ -1790,7 +1803,7 @@ app.put("/rutas/:id/actualizar-duracion", async (req, res) => {
 //-------------------- DELETE 
 
 // Eliminar ruta
-app.delete("/rutas/:id", async (req, res) => {
+app.delete("/rutas/:id", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     await query(
@@ -1818,7 +1831,7 @@ app.delete("/rutas/:id", async (req, res) => {
 });
 
 // Eliminar punto de todas las rutas y actualizar duracion
-app.delete("/rutas/puntos/:id", async (req, res) => {
+app.delete("/rutas/puntos/:id", adminApiKeyAuth, async (req, res) => {
   const punto_id = req.params.id;
 
   try {
@@ -1882,7 +1895,7 @@ app.delete("/rutas/puntos/:id", async (req, res) => {
 
 
 // Eliminar un punto de una ruta específica y actualizar duración
-app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
+app.delete("/rutas/:ruta_id/puntos/:punto_id", adminApiKeyAuth, async (req, res) => {
   const { ruta_id, punto_id } = req.params;
 
   try {
