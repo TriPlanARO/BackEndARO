@@ -463,7 +463,7 @@ app.get("/usuarios/eventos-favoritos/:usuario_id",apiKeyAuth, async (req, res) =
 
 //-------------------- POST
 // Añadir usuario 
-app.post("/usuarios",adminApiKeyAuth, async (req, res) => { //REVISAR
+app.post("/usuarios",apiKeyAuth, async (req, res) => { //REVISAR
   const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
 
   // Verificar campos obligatorios
