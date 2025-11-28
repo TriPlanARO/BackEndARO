@@ -913,7 +913,7 @@ app.delete("/usuarios/:id",adminApiKeyAuth, async (req, res) => {
 });
 
 // Eliminar ruta personalizada
-app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",adminApiKeyAuth, async (req, res) => { //REVISAR
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => { //REVISAR
   const { usuario_id, ruta_id } = req.params;
   try {
     await query("DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2", [ruta_id, usuario_id]);
