@@ -531,7 +531,7 @@ app.delete("/usuarios/:id", async (req, res) => {
 app.get("/eventos", async (req, res) => {
   try {
     const eventos = await query(`
-      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
         CASE
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -562,7 +562,7 @@ app.get("/eventos/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
         CASE 
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -612,7 +612,7 @@ app.get("/eventos/tipo/:tipos", async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -654,7 +654,7 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -709,7 +709,7 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -742,7 +742,7 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
 //-------------------- POST
 // Añadir nuevo evento con fecha_fin opcional
 app.post("/eventos", async (req, res) => {
-  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, enlace, punto_id } = req.body;
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, enlace, punto_id, precio } = req.body;
 
   // Validar campos obligatorios
   if (!nombre || !tipo || !fecha_ini) {
@@ -764,9 +764,9 @@ app.post("/eventos", async (req, res) => {
     // Insertar el evento
     const result = await query(
       `INSERT INTO eventos (nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id`,
-      [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null, enlace || null]
+      [nombre, tipo, descripcion || null, imagen || null, fecha_ini, fecha_fin || null, punto_id || null, enlace || null, precio || null]
     );
 
     res.status(201).json({
@@ -786,7 +786,7 @@ app.post("/eventos", async (req, res) => {
 //Actualizar eventos
 app.put("/eventos/:id/actualizar", async (req, res) => {
   const id = req.params.id; 
-  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace } = req.body; 
+  const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace, precio } = req.body; 
   const fieldsToUpdate = [];
   const values = [];
 
@@ -832,11 +832,16 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
     values.push(enlace);
   }
 
+  if (precio) {
+    fieldsToUpdate.push('precio = $' + (fieldsToUpdate.length + 1));
+    values.push(precio);
+  }
+
   if (fieldsToUpdate.length === 0) {
     return res.status(400).json({ error: "No se ha proporcionado ningún dato para actualizar" });
   }
 
-  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace";
+  queryText += fieldsToUpdate.join(", ") + " WHERE id = $" + (fieldsToUpdate.length + 1)  + " RETURNING id, nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace, precio";
   values.push(id);
 
 
