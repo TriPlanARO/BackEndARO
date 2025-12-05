@@ -1006,7 +1006,7 @@ app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", apiKeyAuth, asy
 app.get("/eventos", apiKeyAuth, async (req, res) => {
   try {
     const eventos = await query(`
-      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
+      SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio,
         CASE
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -1102,7 +1102,7 @@ app.get("/eventos/:id", apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio,
         CASE 
           WHEN e.punto_id IS NOT NULL THEN json_build_object(
             'id', p.id,
@@ -1152,7 +1152,7 @@ app.get("/eventos/tipo/:tipos", apiKeyAuth, async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio,
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -1194,7 +1194,7 @@ app.get("/eventos/nombre/:nombre", apiKeyAuth, async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio,
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
@@ -1248,7 +1248,7 @@ app.get("/eventos/fecha/:fecha", apiKeyAuth, async (req, res) => {
 
   try {
     const eventos = await query(
-      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio,
               CASE
                 WHEN e.punto_id IS NOT NULL THEN json_build_object(
                   'id', p.id,
