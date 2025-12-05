@@ -4,13 +4,42 @@ import bcrypt from "bcrypt";
 
 const app = express();
 app.use(express.json()); // para procesar JSON
+
+const API_KEY = process.env.API_KEY; // valor por defecto para probar 
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY; // clave API para administradores
+
+//------MIDDLEWARE
+function apiKeyAuth(req, res, next) {
+  // busca en header 'x-api-key' o en query 'api_key'
+  const key = req.get("x-api-key") || req.query.api_key;
+  if (!key) {
+    return res.status(401).json({ error: "Falta API key (usa header 'x-api-key' o query 'api_key')" });
+  }
+  if (key !== API_KEY) {
+    return res.status(403).json({ error: "API key inválida" });
+  }
+  next();
+}
+
+function adminApiKeyAuth(req, res, next) {
+  // busca en header 'x-admin-api-key' o en query 'admin_api_key'
+  const key = req.get("x-admin-api-key") || req.query.admin_api_key;
+  if (!key) {
+    return res.status(401).json({ error: "Falta Admin API key (usa header 'x-admin-api-key' o query 'admin_api_key')" });
+  }
+  if (key !== ADMIN_API_KEY) {
+    return res.status(403).json({ error: "Admin API key inválida" });
+  }
+  next();
+}
+
 const port = process.env.PORT || 10000;
 
 //-------------------- PUNTOS --------------------
 
 //-------------------- GET 
 // Obtener todos los puntos de interés
-app.get("/puntos", async (req, res) => {
+app.get("/puntos",apiKeyAuth, async (req, res) => {
   try {
     const puntos = await query(
       "SELECT ID, NOMBRE, TIPO, LATITUD , LONGITUD, DESCRIPCION, IMAGEN FROM puntos_interes"
@@ -26,7 +55,7 @@ app.get("/puntos", async (req, res) => {
 });
 
 // Obtener punto por ID
-app.get("/puntos/:id", async (req, res) => {
+app.get("/puntos/:id",apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -50,7 +79,7 @@ app.get("/puntos/:id", async (req, res) => {
 });
 
 // Obtener puntos por tipo
-app.get("/puntos/tipo/:tipos", async (req, res) => {
+app.get("/puntos/tipo/:tipos",apiKeyAuth, async (req, res) => {
   const tipos = req.params.tipos.split(',');  
   
   if (tipos.length === 0) {
@@ -76,7 +105,7 @@ app.get("/puntos/tipo/:tipos", async (req, res) => {
 });
 
 // Obtener puntos por nombre 
-app.get("/puntos/nombre/:nombre", async (req, res) => {
+app.get("/puntos/nombre/:nombre",apiKeyAuth, async (req, res) => {
   const nombre = req.params.nombre;
   try {
     const puntos = await query(
@@ -92,7 +121,7 @@ app.get("/puntos/nombre/:nombre", async (req, res) => {
 
 //-------------------- POST 
 //Añadir punto 
-app.post("/puntos", async (req, res) => {
+app.post("/puntos",adminApiKeyAuth, async (req, res) => {
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body;
 
   // Validar campos obligatorios
@@ -123,7 +152,7 @@ app.post("/puntos", async (req, res) => {
 });
 
 // Añadir un nuevo tipo de punto (tipo_enum)
-app.post("/puntos/tipo", async (req, res) => {
+app.post("/puntos/tipo",adminApiKeyAuth, async (req, res) => {
   const { nuevoTipo } = req.body;
 
   // Validar campo obligatorio
@@ -154,7 +183,7 @@ app.post("/puntos/tipo", async (req, res) => {
 
 //-------------------- PUT
 //Actualizar puntos de interés
-app.put("/puntos/:id/actualizar", async (req, res) => {
+app.put("/puntos/:id/actualizar",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre, tipo, latitud, longitud, descripcion, imagen } = req.body; 
   const fieldsToUpdate = [];
@@ -222,7 +251,7 @@ app.put("/puntos/:id/actualizar", async (req, res) => {
 
 //-------------------- DELETE
 //Borrar punto de interés, borrando referencias de eventos y rutas
-app.delete("/puntos/:id", async (req, res) => {
+app.delete("/puntos/:id",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
 
   try {
@@ -258,7 +287,7 @@ app.delete("/puntos/:id", async (req, res) => {
 
 //-------------------- GET 
 // Obtener todos los usuarios
-app.get("/usuarios", async (req, res) => {
+app.get("/usuarios",apiKeyAuth, async (req, res) => {
   try {
     const usuarios = await query(
       "SELECT ID, NOMBRE_USUARIO, NOMBRE, APELLIDO, EMAIL, CONTRASENA, TELEFONO FROM usuarios"
@@ -274,7 +303,7 @@ app.get("/usuarios", async (req, res) => {
 });
 
 // Obtener usuario por ID
-app.get("/usuarios/:id", async (req, res) => {
+app.get("/usuarios/:id",apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const usuario = await query(
@@ -298,7 +327,7 @@ app.get("/usuarios/:id", async (req, res) => {
 });
 
 // Obtener usuario por email
-app.get("/usuarios/email/:email", async (req, res) => {
+app.get("/usuarios/email/:email",apiKeyAuth, async (req, res) => {
   const email = req.params.email;
   try {
     const usuario = await query(
@@ -321,9 +350,120 @@ app.get("/usuarios/email/:email", async (req, res) => {
   }
 });
 
+// Obtener todas las rutas personalizadas de un usuario
+app.get("/usuarios/:usuario_id/rutas-personalizadas",apiKeyAuth, async (req, res) => {
+  const { usuario_id } = req.params;
+  try {
+    const rutas = await query(
+      `SELECT r.*, 
+              json_agg(
+                json_build_object(
+                  'id', p.id, 
+                  'nombre', p.nombre, 
+                  'tipo', p.tipo, 
+                  'latitud', p.latitud, 
+                  'longitud', p.longitud, 
+                  'descripcion', p.descripcion, 
+                  'imagen', p.imagen
+                )
+              ) AS puntos_interes
+       FROM rutas_personalizadas r
+       LEFT JOIN relacion_rutas_personalizadas_puntos r2 
+              ON r.id = r2.ruta_id AND r2.usuario_id=$1
+       LEFT JOIN puntos_interes p 
+              ON r2.punto_id = p.id
+       WHERE r.usuario_id=$1
+       GROUP BY r.id
+       ORDER BY r.id ASC`,
+      [usuario_id]
+    );
+    res.json(rutas);
+  } catch (err) {
+    console.error("Error al consultar rutas personalizadas de usuario:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Obtener una ruta personalizada por ID y usuario
+app.get("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  try {
+    const result = await query(
+      `SELECT r.*, 
+              json_agg(
+                json_build_object(
+                  'id', p.id, 
+                  'nombre', p.nombre, 
+                  'tipo', p.tipo, 
+                  'latitud', p.latitud, 
+                  'longitud', p.longitud, 
+                  'descripcion', p.descripcion, 
+                  'imagen', p.imagen
+                )
+              ) AS puntos_interes
+       FROM rutas_personalizadas r
+       LEFT JOIN relacion_rutas_personalizadas_puntos r2 
+              ON r.id = r2.ruta_id AND r2.usuario_id=$1
+       LEFT JOIN puntos_interes p 
+              ON r2.punto_id = p.id
+       WHERE r.id=$2 AND r.usuario_id=$1
+       GROUP BY r.id`,
+      [usuario_id, ruta_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Ruta personalizada no encontrada" });
+    }
+
+    res.json(result[0]);
+  } catch (err) {
+    console.error("Error al obtener ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Obtener eventos favoritos de un usuario
+app.get("/usuarios/eventos-favoritos/:usuario_id",apiKeyAuth, async (req, res) => {
+  const { usuario_id } = req.params;
+
+  try {
+    const eventosFavoritos = await query(
+      `SELECT ef.usuario_id, ef.evento_id, 
+              e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE 
+                WHEN e.punto_id IS NOT NULL THEN 
+                  json_build_object(
+                    'id', p.id, 
+                    'nombre', p.nombre, 
+                    'tipo', p.tipo, 
+                    'latitud', p.latitud, 
+                    'longitud', p.longitud, 
+                    'descripcion', p.descripcion, 
+                    'imagen', p.imagen
+                  )
+              END AS punto
+       FROM eventos_favoritos ef
+       JOIN eventos e ON ef.evento_id = e.id
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE ef.usuario_id = $1
+       ORDER BY e.id;`,
+      [usuario_id]
+    );
+
+    res.status(200).json(eventosFavoritos);
+  } catch (err) {
+    console.error("Error al consultar eventos favoritos del usuario:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message,
+    });
+  }
+});
+
+
 //-------------------- POST
 // Añadir usuario 
-app.post("/usuarios", async (req, res) => {
+app.post("/usuarios",apiKeyAuth, async (req, res) => { //REVISAR
   const { nombre_usuario, nombre, apellido, email, contraseña, telefono } = req.body;
 
   // Verificar campos obligatorios
@@ -369,7 +509,7 @@ app.post("/usuarios", async (req, res) => {
 });
 
 //Comprobar credenciales login
-app.post("/login", async (req, res) => {
+app.post("/login",apiKeyAuth, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -380,17 +520,205 @@ app.post("/login", async (req, res) => {
     const match = await bcrypt.compare(password, usuario.contrasena);
     if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    res.json({ nombre: usuario.nombre, id: usuario.id });
+    res.json({mensaje:"login correcto y token creado", nombre: usuario.nombre, id: usuario.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
+// Crear nueva ruta personalizada con puntos y calcular duración
+app.post("/usuarios/:usuario_id/rutas-personalizadas",apiKeyAuth, async (req, res) => {
+  const { usuario_id } = req.params;
+  const { nombre, descripcion, puntos } = req.body; // puntos es array de IDs
+
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
+  if (puntos && !Array.isArray(puntos)) return res.status(400).json({ error: "Los puntos deben ser un array" });
+
+  try {
+    // Evitar duplicar nombres para el mismo usuario
+    const existe = await query(
+      "SELECT * FROM rutas_personalizadas WHERE nombre=$1 AND usuario_id=$2",
+      [nombre, usuario_id]
+    );
+    if (existe.length > 0) {
+      return res.status(409).json({ error: "Ya existe una ruta personalizada con ese nombre para este usuario" });
+    }
+
+    // Crear ruta
+    const resultRuta = await query(
+      "INSERT INTO rutas_personalizadas (usuario_id, nombre, descripcion) VALUES ($1,$2,$3) RETURNING *",
+      [usuario_id, nombre, descripcion || null]
+    );
+    const nuevaRuta = resultRuta[0];
+
+    if (puntos && puntos.length > 0) {
+      await query("BEGIN");
+
+      const añadidos = [];
+      const duplicados = [];
+
+      for (const punto_id of puntos) {
+        // Verificar si ya existe la relación
+        const existeRel = await query(
+          "SELECT * FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3",
+          [nuevaRuta.id, usuario_id, punto_id]
+        );
+        if (existeRel.length > 0) duplicados.push(punto_id);
+        else {
+          await query(
+            "INSERT INTO relacion_rutas_personalizadas_puntos (ruta_id, usuario_id, punto_id) VALUES ($1,$2,$3)",
+            [nuevaRuta.id, usuario_id, punto_id]
+          );
+          añadidos.push(punto_id);
+        }
+      }
+
+      await query("COMMIT");
+
+      // Actualizar duración
+      const updateDuracionQuery = `
+        UPDATE rutas_personalizadas
+        SET duracion = COALESCE(ROUND((
+          WITH puntos_ruta AS (
+            SELECT p.id, p.latitud, p.longitud
+            FROM relacion_rutas_personalizadas_puntos rp
+            JOIN puntos_interes p ON p.id = rp.punto_id
+            WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+          )
+          SELECT SUM(min_dist)
+          FROM (
+            SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+            FROM puntos_ruta p1
+            JOIN puntos_ruta p2 ON p1.id<>p2.id
+            GROUP BY p1.id
+          ) sub
+        )/5*60),0)
+        WHERE id=$1 AND usuario_id=$2
+        RETURNING duracion;
+      `;
+      const duracionResult = await query(updateDuracionQuery, [nuevaRuta.id, usuario_id]);
+
+      res.status(201).json({
+        mensaje: "Ruta personalizada creada y duración calculada",
+        ruta: { ...nuevaRuta, duracion: duracionResult[0].duracion },
+        puntos_añadidos: añadidos,
+        puntos_duplicados: duplicados
+      });
+    } else {
+      res.status(201).json({ mensaje: "Ruta personalizada creada", ruta: nuevaRuta, duracion: 0 });
+    }
+
+  } catch (err) {
+    await query("ROLLBACK");
+    console.error("Error al crear ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Añadir un punto a una ruta personalizada existente
+app.post("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos",apiKeyAuth, async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  const { punto_id } = req.body;
+  if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
+
+  try {
+    // Verificar existencia del punto
+    const puntoRes = await query("SELECT latitud,longitud FROM puntos_interes WHERE id=$1", [punto_id]);
+    if (!puntoRes || puntoRes.length === 0) return res.status(404).json({ error: "Punto no encontrado" });
+
+    // Insertar relación, evitando duplicado
+    const existeRel = await query(
+      "SELECT * FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3",
+      [ruta_id, usuario_id, punto_id]
+    );
+    if (existeRel.length > 0) return res.status(409).json({ error: "Punto ya añadido a esta ruta" });
+
+    await query(
+      "INSERT INTO relacion_rutas_personalizadas_puntos (ruta_id, usuario_id, punto_id) VALUES ($1,$2,$3)",
+      [ruta_id, usuario_id, punto_id]
+    );
+
+    // Recalcular duración
+    const updateDuracionQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING duracion;
+    `;
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, usuario_id]);
+
+    res.status(201).json({
+      mensaje: "Punto añadido y duración actualizada",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
+    });
+
+  } catch (err) {
+    console.error("Error al añadir punto a ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Añadir un evento a favoritos de un usuario
+app.post("/usuarios/eventos-favoritos",apiKeyAuth, async (req, res) => {
+  const { usuario_id, evento_id } = req.body;
+
+  if (!usuario_id || !evento_id) {
+    return res.status(400).json({ error: "Faltan datos: usuario_id o evento_id" });
+  }
+
+  try {
+    // Verificar si ya existe la relación
+    const existe = await query(
+      "SELECT * FROM eventos_favoritos WHERE usuario_id = $1 AND evento_id = $2",
+      [usuario_id, evento_id]
+    );
+
+    if (existe.length > 0) {
+      return res.status(409).json({ mensaje: "Evento ya está en favoritos" });
+    }
+
+    // Insertar el evento en favoritos
+    const result = await query(
+      "INSERT INTO eventos_favoritos (usuario_id, evento_id) VALUES ($1, $2) RETURNING *",
+      [usuario_id, evento_id]
+    );
+
+    res.status(201).json({
+      mensaje: "Evento añadido a favoritos correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al añadir evento favorito:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
+
+
 //-------------------- PUT
 
 //Actualizar la contraseña de un usuario
-app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
+app.put("/usuarios/:id/cambiar-contrasena",apiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nueva_contraseña, vieja_contraseña } = req.body; 
 
@@ -436,7 +764,7 @@ app.put("/usuarios/:id/cambiar-contrasena", async (req, res) => {
 });
 
 //Actualizar cualquier campo de usuarios
-app.put("/usuarios/:id/actualizar", async (req, res) => {
+app.put("/usuarios/:id/actualizar",apiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre_usuario, nombre, apellido, email, telefono } = req.body; 
 
@@ -497,9 +825,70 @@ app.put("/usuarios/:id/actualizar", async (req, res) => {
   }
 });
 
+// Actualizar ruta personalizada (nombre, descripcion)
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+  const { nombre, descripcion } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (nombre) { fields.push(`nombre=$${fields.length+1}`); values.push(nombre); }
+  if (descripcion) { fields.push(`descripcion=$${fields.length+1}`); values.push(descripcion); }
+  if (fields.length === 0) return res.status(400).json({ error: "No se proporcionó dato a actualizar" });
+
+  values.push(ruta_id, usuario_id);
+
+  const queryText = `UPDATE rutas_personalizadas SET ${fields.join(", ")} WHERE id=$${values.length-1} AND usuario_id=$${values.length} RETURNING *`;
+
+  try {
+    const result = await query(queryText, values);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+    res.status(200).json({ mensaje: "Ruta personalizada actualizada", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Actualizar duración de ruta personalizada
+app.put("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/actualizar-duracion",apiKeyAuth, async (req, res) => {
+  const { usuario_id, ruta_id } = req.params;
+
+  try {
+    const updateQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING id,duracion;
+    `;
+    const result = await query(updateQuery, [ruta_id, usuario_id]);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+
+    res.status(200).json({ mensaje: "Duración actualizada", ruta: result[0] });
+  } catch (err) {
+    console.error("Error al actualizar duración de ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
 //-------------------- DELETE
 //Borrar usuario
-app.delete("/usuarios/:id", async (req, res) => {
+app.delete("/usuarios/:id",adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -523,12 +912,98 @@ app.delete("/usuarios/:id", async (req, res) => {
   }
 });
 
+// Eliminar ruta personalizada
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id",apiKeyAuth, async (req, res) => { //REVISAR
+  const { usuario_id, ruta_id } = req.params;
+  try {
+    await query("DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2", [ruta_id, usuario_id]);
+    const result = await query("DELETE FROM rutas_personalizadas WHERE id=$1 AND usuario_id=$2 RETURNING *", [ruta_id, usuario_id]);
+    if (!result || result.length === 0) return res.status(404).json({ error: "Ruta no encontrada" });
+    res.status(200).json({ mensaje: "Ruta personalizada eliminada", ruta_id });
+  } catch (err) {
+    console.error("Error al eliminar ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Eliminar un punto de una ruta personalizada
+app.delete("/usuarios/:usuario_id/rutas-personalizadas/:ruta_id/puntos/:punto_id",adminApiKeyAuth, async (req, res) => { //REVISAR
+  const { usuario_id, ruta_id, punto_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM relacion_rutas_personalizadas_puntos WHERE ruta_id=$1 AND usuario_id=$2 AND punto_id=$3 RETURNING *",
+      [ruta_id, usuario_id, punto_id]
+    );
+    if (!result || result.length === 0) return res.status(404).json({ error: "Relación ruta-punto no encontrada" });
+
+    // Recalcular duración
+    const updateDuracionQuery = `
+      UPDATE rutas_personalizadas
+      SET duracion = COALESCE(ROUND((
+        WITH puntos_ruta AS (
+          SELECT p.id,p.latitud,p.longitud
+          FROM relacion_rutas_personalizadas_puntos rp
+          JOIN puntos_interes p ON p.id = rp.punto_id
+          WHERE rp.ruta_id=$1 AND rp.usuario_id=$2
+        )
+        SELECT SUM(min_dist)
+        FROM (
+          SELECT MIN(haversine(p1.latitud,p1.longitud,p2.latitud,p2.longitud)) AS min_dist
+          FROM puntos_ruta p1
+          JOIN puntos_ruta p2 ON p1.id<>p2.id
+          GROUP BY p1.id
+        ) sub
+      )/5*60),0)
+      WHERE id=$1 AND usuario_id=$2
+      RETURNING duracion;
+    `;
+    const duracionResult = await query(updateDuracionQuery, [ruta_id, usuario_id]);
+
+    res.status(200).json({
+      mensaje: "Punto eliminado y duración actualizada",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
+    });
+  } catch (err) {
+    console.error("Error al eliminar punto de ruta personalizada:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+// Eliminar un evento favorito de un usuario
+app.delete("/usuarios/eventos-favoritos/:usuario_id/:evento_id", apiKeyAuth, async (req, res) => { //REVISAR
+  const { usuario_id, evento_id } = req.params;
+
+  try {
+    const result = await query(
+      "DELETE FROM eventos_favoritos WHERE usuario_id = $1 AND evento_id = $2 RETURNING *",
+      [usuario_id, evento_id]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "No se encontró el evento favorito para eliminar" });
+    }
+
+    res.status(200).json({
+      mensaje: "Evento favorito eliminado correctamente",
+      favorito: result[0],
+    });
+  } catch (err) {
+    console.error("Error al eliminar evento favorito:", err);
+    res.status(500).json({ 
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
 
 //-------------------- EVENTOS --------------------
 //-------------------- GET 
 
 // Obtener todos los eventos
-app.get("/eventos", async (req, res) => {
+app.get("/eventos", apiKeyAuth, async (req, res) => {
   try {
     const eventos = await query(`
       SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace, e.precio
@@ -557,8 +1032,73 @@ app.get("/eventos", async (req, res) => {
   }
 });
 
+//Obtener evento por rango de fechas
+app.get("/eventos/rango", apiKeyAuth, async (req, res) => {
+  const { fecha_ini, fecha_fin } = req.query;
+  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!fecha_ini || !fecha_fin || !regexFecha.test(fecha_ini) || !regexFecha.test(fecha_fin)) {
+    return res.status(400).json({ error: "Hay que añadir tanto la fecha de inicio como la fecha de fin en formato valido (en formato YYYY-MM-DD)" });
+  }
+
+  const fechaObjIni = new Date(fecha_ini);
+  const fechaObjFin = new Date(fecha_fin);
+  
+  const fechaValidaIni =
+    fechaObjIni instanceof Date &&
+    !isNaN(fechaObjIni) &&
+    fechaObjIni.toISOString().startsWith(fecha_ini);
+
+  const fechaValidaFin =
+    fechaObjFin instanceof Date &&
+    !isNaN(fechaObjFin) &&
+    fechaObjFin.toISOString().startsWith(fecha_fin);
+
+  if (!fechaValidaIni || !fechaValidaFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio o fin proporcionada no existe."
+    });
+  }
+
+  if (fechaObjIni > fechaObjFin) {
+    return res.status(400).json({
+      error: "La fecha de inicio no puede ser 'mayor' a la fecha fin"
+    });
+  }
+
+  try {
+    const eventos = await query(
+      `SELECT e.id, e.nombre, e.tipo, e.descripcion, e.imagen, e.fecha_ini, e.fecha_fin, e.enlace,
+              CASE WHEN e.punto_id IS NOT NULL THEN json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'tipo', p.tipo,
+                'latitud', p.latitud,
+                'longitud', p.longitud,
+                'descripcion', p.descripcion,
+                'imagen', p.imagen
+              ) END AS punto
+       FROM eventos e
+       LEFT JOIN puntos_interes p ON e.punto_id = p.id
+       WHERE 
+            e.fecha_ini::date <= $2::date
+        AND COALESCE(e.fecha_fin::date, e.fecha_ini::date) >= $1::date
+       ORDER BY e.id`,
+      [fecha_ini, fecha_fin]
+    );
+
+    res.json(eventos);
+  } catch (err) {
+    console.error("Error al consultar eventos por rango:", err);
+    res.status(500).json({
+      error: "Error en la base de datos",
+      detalles: err.message
+    });
+  }
+});
+
 // Obtener evento por ID
-app.get("/eventos/:id", async (req, res) => {
+app.get("/eventos/:id", apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const evento = await query(
@@ -600,7 +1140,7 @@ app.get("/eventos/:id", async (req, res) => {
 
 
 // Obtener eventos por tipo
-app.get("/eventos/tipo/:tipos", async (req, res) => {
+app.get("/eventos/tipo/:tipos", apiKeyAuth, async (req, res) => {
 
   const tipos = req.params.tipos.split(',');
 
@@ -643,7 +1183,7 @@ app.get("/eventos/tipo/:tipos", async (req, res) => {
 });
 
 // Obtener eventos por nombre
-app.get("/eventos/nombre/:nombre", async (req, res) => {
+app.get("/eventos/nombre/:nombre", apiKeyAuth, async (req, res) => {
   const nombre = req.params.nombre;
 
   if (!nombre) {
@@ -684,7 +1224,7 @@ app.get("/eventos/nombre/:nombre", async (req, res) => {
 });
 
 // Obtener eventos por fecha
-app.get("/eventos/fecha/:fecha", async (req, res) => {
+app.get("/eventos/fecha/:fecha", apiKeyAuth, async (req, res) => {
   const fecha = req.params.fecha;
   const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -693,7 +1233,6 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
       error: "Debe proporcionar una fecha válida (en formato YYYY-MM-DD)."
     });
   }
-
 
   const fechaObj = new Date(fecha);
   const fechaValida =
@@ -738,10 +1277,9 @@ app.get("/eventos/fecha/:fecha", async (req, res) => {
   }
 });
 
-
 //-------------------- POST
 // Añadir nuevo evento con fecha_fin opcional
-app.post("/eventos", async (req, res) => {
+app.post("/eventos", adminApiKeyAuth, async (req, res) => {
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, enlace, punto_id, precio } = req.body;
 
   // Validar campos obligatorios
@@ -784,7 +1322,7 @@ app.post("/eventos", async (req, res) => {
 
 //-------------------- PUT 
 //Actualizar eventos
-app.put("/eventos/:id/actualizar", async (req, res) => {
+app.put("/eventos/:id/actualizar", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id; 
   const { nombre, tipo, descripcion, imagen, fecha_ini, fecha_fin, punto_id, enlace, precio } = req.body; 
   const fieldsToUpdate = [];
@@ -869,7 +1407,7 @@ app.put("/eventos/:id/actualizar", async (req, res) => {
 
 //-------------------- DELETE 
 //Borrar evento
-app.delete("/eventos/:id", async (req, res) => {
+app.delete("/eventos/:id", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -898,7 +1436,7 @@ app.delete("/eventos/:id", async (req, res) => {
 //-------------------- GET 
 
 // Obtener todos las rutas
-app.get("/rutas", async (req, res) => {
+app.get("/rutas", apiKeyAuth, async (req, res) => {
   try {
     const rutas = await query(
       `SELECT r.*, 
@@ -930,7 +1468,7 @@ app.get("/rutas", async (req, res) => {
 });
 
 // Obtener una ruta por ID
-app.get("/rutas/:id", async (req, res) => {
+app.get("/rutas/:id", apiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     const result = await query(
@@ -970,8 +1508,8 @@ app.get("/rutas/:id", async (req, res) => {
 });
 //-------------------- POST 
 
-// Añadir una nueva ruta con puntos, evitando duplicados
-app.post("/rutas", async (req, res) => {
+// Añadir una nueva ruta con puntos, evitando duplicados y calculando duración
+app.post("/rutas", adminApiKeyAuth, async (req, res) => {
   const { nombre, descripcion, puntos } = req.body; // puntos es un array de IDs
 
   if (!nombre) return res.status(400).json({ error: "Falta el nombre de la ruta" });
@@ -1029,17 +1567,49 @@ app.post("/rutas", async (req, res) => {
 
       await query("COMMIT");
 
+      // Actualizar duración total de la ruta recién creada
+      const updateDuracionQuery = `
+        UPDATE rutas
+        SET duracion = ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        )
+        WHERE id = $1
+        RETURNING duracion;
+      `;
+      const duracionResult = await query(updateDuracionQuery, [nuevaRuta.id]);
+
       res.status(201).json({
-        mensaje: "Ruta y puntos añadidos correctamente",
-        ruta: nuevaRuta,
+        mensaje: "Ruta y puntos añadidos correctamente, duración calculada",
+        ruta: {
+          ...nuevaRuta,
+          duracion: duracionResult[0].duracion
+        },
         puntos_añadidos: añadidos,
         puntos_duplicados: duplicados
       });
+
     } else {
       res.status(201).json({
         mensaje: "Ruta añadida correctamente",
         ruta: nuevaRuta,
-        puntos_asociados: []
+        puntos_asociados: [],
+        duracion: 0
       });
     }
 
@@ -1051,35 +1621,80 @@ app.post("/rutas", async (req, res) => {
 });
 
 
-//Añadir un nuevo punto a una ruta
-app.post("/rutas/:ruta_id/puntos", async (req, res) => {
+//Insertar uun punto a una ruta especifica (se actualiza su duracion sumandole el tiempo del punto añadido)
+app.post("/rutas/:ruta_id/puntos", adminApiKeyAuth, async (req, res) => {
   const { ruta_id } = req.params;
   const { punto_id } = req.body; 
   if (!punto_id) return res.status(400).json({ error: "Falta el id del punto" });
 
   try {
+    // Obtener coordenadas del nuevo punto
+    const nuevoPuntoResult = await query(
+      "SELECT latitud, longitud FROM puntos_interes WHERE id = $1",
+      [punto_id]
+    );
 
-    const result = await query(
-        "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
-        [ruta_id, punto_id]
-      );
+    if (!nuevoPuntoResult || nuevoPuntoResult.length === 0) {
+      return res.status(404).json({ error: "Punto no encontrado" });
+    }
+
+    const { latitud: lat_np, longitud: lon_np } = nuevoPuntoResult[0];
+
+    // Insertar el nuevo punto en la ruta
+    await query(
+      "INSERT INTO relacion_rutas_puntos (ruta_id, punto_id) VALUES ($1, $2)",
+      [ruta_id, punto_id]
+    );
+
+    // Recalcular duración completa usando la misma lógica que PUT /rutas/:id/actualizar-duracion
+    const updateDuracionQuery = `
+      UPDATE rutas
+      SET duracion = COALESCE(
+        ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        ), 0
+      )
+      WHERE id = $1
+      RETURNING duracion;
+    `;
+
+    const duracionResult = await query(updateDuracionQuery, [ruta_id]);
 
     res.status(201).json({
-      mensaje: "Punto añadido a ruta correctamente",
-      ruta: ruta_id,
-      punto: punto_id
+      mensaje: "Punto añadido y duración actualizada aproximadamente",
+      ruta_id,
+      punto_id,
+      duracion: duracionResult[0].duracion
     });
 
   } catch (err) {
-    console.error("Error al añadir punto a ruta:", err);
+    console.error("Error al añadir punto y actualizar duración:", err);
     res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
 
+
+
 //-------------------- PUT 
 //Actualizar rutas
-app.put("/rutas/:id/actualizar", async (req, res) => {
+app.put("/rutas/:id/actualizar", adminApiKeyAuth, async (req, res) => {
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
 
@@ -1135,10 +1750,65 @@ app.put("/rutas/:id/actualizar", async (req, res) => {
   
 });
 
+// PUT /rutas/:id/actualizar-duracion
+app.put("/rutas/:id/actualizar-duracion", adminApiKeyAuth, async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) return res.status(400).json({ error: "Falta el id de la ruta" });
+
+  try {
+    // Actualizar la duracion usando Haversine y velocidad promedio 5 km/h
+    const queryText = `
+      UPDATE rutas
+      SET duracion = CASE
+        WHEN (SELECT COUNT(*) FROM relacion_rutas_puntos WHERE ruta_id = $1) <= 1 THEN 0
+        ELSE ROUND(
+          (
+            WITH puntos_ruta AS (
+                SELECT p.id, p.latitud, p.longitud
+                FROM relacion_rutas_puntos rp
+                JOIN puntos_interes p ON p.id = rp.punto_id
+                WHERE rp.ruta_id = $1
+            )
+            SELECT SUM(min_dist)
+            FROM (
+                SELECT MIN(
+                    haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                ) AS min_dist
+                FROM puntos_ruta p1
+                JOIN puntos_ruta p2 ON p1.id <> p2.id
+                GROUP BY p1.id
+            ) sub
+          ) / 5 * 60
+        )
+      END
+      WHERE id = $1
+      RETURNING id, duracion;
+    `;
+
+    const result = await query(queryText, [id]);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: "Ruta no encontrada" });
+    }
+
+    res.status(200).json({
+      mensaje: "Duración de la ruta actualizada",
+      ruta: result[0]
+    });
+
+  } catch (err) {
+    console.error("Error al actualizar duración de la ruta:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
+  }
+});
+
+
+
 //-------------------- DELETE 
 
 // Eliminar ruta
-app.delete("/rutas/:id", async (req, res) => {
+app.delete("/rutas/:id", adminApiKeyAuth, async (req, res) => {
   const id = req.params.id;
   try {
     await query(
@@ -1165,35 +1835,76 @@ app.delete("/rutas/:id", async (req, res) => {
   }
 });
 
-// Eliminar punto de todas las rutas
-app.delete("/rutas/puntos/:id", async (req, res) => {
-  const id = req.params.id;
+// Eliminar punto de todas las rutas y actualizar duracion
+app.delete("/rutas/puntos/:id", adminApiKeyAuth, async (req, res) => {
+  const punto_id = req.params.id;
+
   try {
-    const result = await query(
-      "DELETE FROM relacion_rutas_puntos WHERE punto_id = $1 RETURNING *",
-      [id]
+    // Obtener coordenadas del punto que se va a eliminar
+    const puntoResult = await query(
+      "SELECT latitud, longitud FROM puntos_interes WHERE id = $1",
+      [punto_id]
     );
-    if (result.length === 0) {
+
+    if (!puntoResult || puntoResult.length === 0) {
       return res.status(404).json({ error: "Punto no encontrado" });
     }
+
+    const { latitud: lat_np, longitud: lon_np } = puntoResult[0];
+
+    // Obtener todas las rutas donde está este punto
+    const rutasResult = await query(
+      "SELECT ruta_id FROM relacion_rutas_puntos WHERE punto_id = $1",
+      [punto_id]
+    );
+
+    if (!rutasResult || rutasResult.length === 0) {
+      return res.status(404).json({ error: "El punto no está asociado a ninguna ruta" });
+    }
+
+    // Eliminar el punto de todas las rutas
+    const deleted = await query(
+      "DELETE FROM relacion_rutas_puntos WHERE punto_id = $1 RETURNING *",
+      [punto_id]
+    );
+
+    // Actualizar duración aproximada de cada ruta restando el tiempo del punto eliminado
+    for (const ruta of rutasResult) {
+      const updateDuracionQuery = `
+        UPDATE rutas
+        SET duracion = GREATEST(duracion - ROUND(
+          (
+            SELECT MIN(haversine(p.latitud, p.longitud, $2, $3))
+            FROM relacion_rutas_puntos rp
+            JOIN puntos_interes p ON p.id = rp.punto_id
+            WHERE rp.ruta_id = $1
+          ) / 5 * 60
+        ), 0)
+        WHERE id = $1
+        RETURNING duracion;
+      `;
+      await query(updateDuracionQuery, [ruta.ruta_id, lat_np, lon_np]);
+    }
+
     res.status(200).json({
-      mensaje: "Punto eliminado correctamente de todas las rutas",
-      punto_id: result[0].id,
+      mensaje: "Punto eliminado correctamente de todas las rutas y duración actualizada",
+      punto_id,
+      rutas_afectadas: rutasResult.map(r => r.ruta_id)
     });
+
   } catch (err) {
-    console.error("Error al eliminar punto:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-       detalles: err.message 
-    });
+    console.error("Error al eliminar punto y actualizar duración:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
-// Eliminar un punto de una ruta específica
-app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
-  const { ruta_id, punto_id } = req.params; // recibimos ambos IDs
+
+// Eliminar un punto de una ruta específica y actualizar duración
+app.delete("/rutas/:ruta_id/puntos/:punto_id", adminApiKeyAuth, async (req, res) => {
+  const { ruta_id, punto_id } = req.params;
 
   try {
+    // Primero eliminar la relación
     const result = await query(
       "DELETE FROM relacion_rutas_puntos WHERE ruta_id = $1 AND punto_id = $2 RETURNING *",
       [ruta_id, punto_id]
@@ -1203,17 +1914,44 @@ app.delete("/rutas/:ruta_id/puntos/:punto_id", async (req, res) => {
       return res.status(404).json({ error: "No se encontró la relación ruta-punto" });
     }
 
+    // Recalcular la duración de la ruta después de eliminar el punto
+    const updateDuracionQuery = `
+      UPDATE rutas
+      SET duracion = COALESCE(ROUND(
+        (
+          WITH puntos_ruta AS (
+              SELECT p.id, p.latitud, p.longitud
+              FROM relacion_rutas_puntos rp
+              JOIN puntos_interes p ON p.id = rp.punto_id
+              WHERE rp.ruta_id = $1
+          )
+          SELECT SUM(min_dist)
+          FROM (
+              SELECT MIN(
+                  haversine(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+              ) AS min_dist
+              FROM puntos_ruta p1
+              JOIN puntos_ruta p2 ON p1.id <> p2.id
+              GROUP BY p1.id
+          ) sub
+        ) / 5 * 60
+      ), 0)
+      WHERE id = $1
+      RETURNING duracion;
+    `;
+
+    const duracionResult = await query(updateDuracionQuery, [ruta_id]);
+
     res.status(200).json({
-      mensaje: "Punto eliminado correctamente de la ruta",
+      mensaje: "Punto eliminado y duración actualizada correctamente",
       ruta_id: result[0].ruta_id,
       punto_id: result[0].punto_id,
+      duracion: duracionResult[0].duracion
     });
+
   } catch (err) {
-    console.error("Error al eliminar punto de la ruta:", err);
-    res.status(500).json({ 
-      error: "Error en la base de datos",
-      detalles: err.message 
-    });
+    console.error("Error al eliminar punto de la ruta y actualizar duración:", err);
+    res.status(500).json({ error: "Error en la base de datos", detalles: err.message });
   }
 });
 
